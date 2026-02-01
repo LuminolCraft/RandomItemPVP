@@ -172,7 +172,7 @@ RandomItemPVP/
         ├── database.yml             # 数据库配置
         ├── maps.yml                 # 地图列表配置
         └── allies.yml               # 盟友生物配置
-```
+```menmen
 
 ---
 
