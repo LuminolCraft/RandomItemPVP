@@ -1,0 +1,248 @@
+# ==========================================
+# RandomItemPVP - 物品配置模块
+# ==========================================
+# 此文件包含物品发放和权重配置
+# 如果启用模块化配置，此文件会覆盖主配置文件中的物品设置
+# ==========================================
+
+# 物品发放设置
+interval_ticks: 100    # 物品发放间隔（ticks，100=5秒）
+
+# ==========================================
+# 物品权重配置（权重越高出现概率越大）
+# ==========================================
+# 📌 重要说明：
+#   - 只有在此配置的物品才会掉落！
+#   - 要添加新物品，只需添加一行：物品ID: 权重
+#   - 要移除物品，删除对应行或将权重设为0
+#
+# 🔢 权重系统工作原理：
+#   - 权重为10的物品出现概率是权重为1的物品的10倍
+#   - 所有物品的权重加起来形成一个"池子"，每个物品占据对应的比例
+#
+# 📊 示例计算：
+#   假设只有3个物品：A(权重100)、B(权重10)、C(权重1)
+#   总权重 = 111
+#   A的概率 = 100/111 = 90.1%
+#   B的概率 = 10/111 = 9.0%
+#   C的概率 = 1/111 = 0.9%
+#
+# 💡 如何添加新物品：
+#   1. 找到物品的英文ID（例如：DIAMOND_SWORD）
+#   2. 在下方添加：DIAMOND_SWORD: 50
+#   3. 使用 /ripvp reload 重载配置
+#
+# 📝 建议权重范围：1-60（避免差距过大影响游戏体验）
+# ==========================================
+weights:
+  # ==========================================
+  # 方块 - 高权重（主要掉落物）
+  # ==========================================
+  
+  # 基础搭建方块（权重 50-80）
+  COBBLESTONE: 80              # 圆石（最常见搭建材料）
+  STONE: 75                    # 石头
+  DIRT: 70                     # 泥土
+  OAK_PLANKS: 65               # 橡木板
+  SPRUCE_PLANKS: 60            # 云杉木板
+  BIRCH_PLANKS: 60             # 白桦木板
+  ACACIA_PLANKS: 55            # 金合欢木板
+  OAK_LOG: 55                  # 橡木原石
+  SPRUCE_LOG: 55               # 云杉原木
+  COAL_BLOCK: 50               # 煤炭块
+  SAND: 55                     # 沙子
+  GRAVEL: 50                   # 沙砾
+  
+  # 建筑方块（权重 35-55）
+  STONE_BRICKS: 50             # 石砖
+  CRACKED_STONE_BRICKS: 45     # 裂石砖
+  COBBLESTONE_WALL: 45         # 圆石墙
+  BRICK_BLOCK: 40              # 砖块
+  SANDSTONE: 40                # 砂岩
+  RED_SANDSTONE: 40            # 红砂岩
+  QUARTZ_BLOCK: 35             # 石英块
+  PURPUR_BLOCK: 35             # 紫珀块
+  PRISMARINE: 35               # 海晶石
+  DARK_PRISMARINE: 35          # 暗海晶石
+  
+  # 功能方块（权重 30-50）
+  OBSIDIAN: 45                 # 黑曜石
+  GLASS: 50                    # 玻璃
+  WHITE_WOOL: 45               # 白色羊毛
+  GRAY_WOOL: 40                # 灰色羊毛
+  LIGHT_GRAY_WOOL: 40          # 浅灰色羊毛
+  BROWN_WOOL: 35               # 棕色羊毛
+  BLACK_WOOL: 35               # 黑色羊毛
+  COBWEB: 40                   # 蜘蛛网
+  TORCH: 45                    # 火把
+  SOUL_TORCH: 30               # 灵魂火把
+  
+  # 压力板和按钮（权重 25-35）
+  STONE_PRESSURE_PLATE: 30     # 石压力板
+  OAK_PRESSURE_PLATE: 25       # 木压力板
+  STONE_BUTTON: 30             # 石按钮
+  OAK_BUTTON: 25               # 木按钮
+  LEVER: 30                    # 拉杆
+  
+  # 台阶和楼梯（权重 30-45）
+  COBBLESTONE_STAIRS: 40       # 圆石楼梯
+  STONE_STAIRS: 40             # 石楼梯
+  OAK_STAIRS: 35               # 橡木楼梯
+  BRICK_STAIRS: 35             # 砖楼梯
+  SANDSTONE_STAIRS: 35         # 砂岩楼梯
+  COBBLESTONE_SLAB: 45         # 圆石台阶
+  STONE_SLAB: 45               # 石台阶
+  OAK_SLAB: 40                 # 橡木台阶
+  BRICK_SLAB: 35               # 砖台阶
+  
+  # 地毯（权重 25-35）
+  WHITE_CARPET: 30             # 白色地毯
+  GRAY_CARPET: 30              # 灰色地毯
+  BLACK_CARPET: 25             # 黑色地毯
+  BROWN_CARPET: 25             # 棕色地毯
+  RED_CARPET: 30               # 红色地毯
+  BLUE_CARPET: 30              # 蓝色地毯
+  GREEN_CARPET: 30             # 绿色地毯
+  YELLOW_CARPET: 25            # 黄色地毯
+  
+  # 陷阱相关方块（权重 20-30）
+  TNT: 30                       # TNT
+  dispenser: 25                 # 发射器
+  DROPPER: 25                   # 投掷器
+  TRIPWIRE_HOOK: 20             # 绊线钩
+  tripwire: 20                  # 绊线
+  
+  # ==========================================
+  # 武器 - 低权重（战斗物品适量即可）
+  # ==========================================
+  
+  # 近战武器（权重 12-20）
+  IRON_SWORD: 20               # 铁剑
+  STONE_SWORD: 15              # 石剑
+  IRON_AXE: 15                 # 铁斧
+  STONE_AXE: 12                # 石斧
+  
+  # 远程武器（权重 15-20）
+  BOW: 20                       # 弓
+  CROSSBOW: 15                  # 弩
+  ARROW: 18                     # 箭
+  
+  # ==========================================
+  # 工具 - 低权重（精简版）
+  # ==========================================
+  
+  # 镐（权重 10-15）
+  IRON_PICKAXE: 15             # 铁镐
+  STONE_PICKAXE: 12            # 石镐
+  
+  # 锹（权重 10-15）
+  IRON_SHOVEL: 15              # 铁锹
+  STONE_SHOVEL: 12             # 石锹
+  
+  # ==========================================
+  # 护甲 - 低权重
+  # ==========================================
+  
+  头盔（权重 6-12）
+  IRON_HELMET: 12              # 铁头盔
+  CHAINMAIL_HELMET: 10         # 锁链头盔
+  LEATHER_HELMET: 8            # 皮革头盔
+  GOLDEN_HELMET: 6             # 金头盔
+  
+  胸甲（权重 6-12）
+  IRON_CHESTPLATE: 12          # 铁胸甲
+  CHAINMAIL_CHESTPLATE: 10     # 锁链胸甲
+  LEATHER_CHESTPLATE: 8        # 皮革胸甲
+  GOLDEN_CHESTPLATE: 6         # 金胸甲
+  
+  护腿（权重 6-12）
+  IRON_LEGGINGS: 12            # 铁护腿
+  CHAINMAIL_LEGGINGS: 10       # 锁链护腿
+  LEATHER_LEGGINGS: 8          # 皮革护腿
+  GOLDEN_LEGGINGS: 6           # 金护腿
+  
+  靴子（权重 6-12）
+  IRON_BOOTS: 12               # 铁靴子
+  CHAINMAIL_BOOTS: 10          # 锁链靴子
+  LEATHER_BOOTS: 8             # 皮革靴子
+  GOLDEN_BOOTS: 6              # 金靴子
+  
+  # 其他护甲（权重 5-10）
+  SHIELD: 10                   # 盾牌
+  ELYTRA: 5                    # 鞘翅
+  
+  # ==========================================
+  # 实用物品 - 中等权重
+  # ==========================================
+  
+  # 药水（权重 15-25）
+  POTION: 25                   # 药水
+  SPLASH_POTION: 20            # 喷溅药水
+  LINGERING_POTION: 15         # 滞留药水
+  
+  # 消耗品（权重 18-30）
+  GOLDEN_APPLE: 30             # 金苹果
+  ENCHANTED_GOLDEN_APPLE: 8    # 附魔金苹果
+  BREAD: 25                    # 面包
+  COOKED_BEEF: 22              # 牛排
+  COOKED_PORKCHOP: 20          # 熟猪排
+  GOLDEN_CARROT: 18            # 金胡萝卜
+  BEETROOT_SOUP: 18            # 甜菜根汤
+  
+  # 移动物品（权重 15-25）
+  ENDER_PEARL: 25              # 末影珍珠
+  SNOWBALL: 22                 # 雪球
+  EGG: 20                      # 鸡蛋
+  FISHING_ROD: 18              # 鱼竿
+  
+  # 方块相关（权重 18-28）
+  MILK_BUCKET: 20              # 牛奶桶
+  FLINT_AND_STEEL: 22          # 打火石
+  COMPASS: 18                  # 指南针
+  CLOCK: 15                    # 时钟
+  MAP: 15                      # 地图
+  
+  # 爆炸物（权重 12-20）
+  FIRE_CHARGE: 18              # 火焰弹
+  END_CRYSTAL: 15              # 末影水晶
+  CREEPER_SPAWN_EGG: 12        # 苦力怕刷怪蛋
+  
+  # ==========================================
+  # 稀有物品 - 极低权重
+  # ==========================================
+  TOTEM_OF_UNDYING: 3          # 图腾
+  NETHERITE_INGOT: 4           # 下界合金锭
+  TRIDENT: 4                   # 三叉戟
+  NETHER_STAR: 2               # 下界之星
+  BEACON: 3                    # 信标
+  
+  # ==========================================
+  # 杂物 - 极低权重
+  # ==========================================
+  STICK: 5                     # 木棍
+  STRING: 5                    # 线
+  LEATHER: 5                   # 皮革
+  FEATHER: 5                   # 羽毛
+  BONE: 5                      # 骨头
+  ROTTEN_FLESH: 5              # 腐肉
+  SPIDER_EYE: 5                # 蜘蛛眼
+  GUNPOWDER: 5                 # 火药
+  SUGAR_CANE: 5                # 甘蔗
+  FLINT: 5                     # 燧石
+  SAND: 5                      # 沙子
+
+# 禁用物品列表
+blacklist:
+  - AIR
+  - BEDROCK
+  - BARRIER
+  - COMMAND_BLOCK
+  - CHAIN_COMMAND_BLOCK
+  - REPEATING_COMMAND_BLOCK
+  - STRUCTURE_BLOCK
+  - JIGSAW
+  - STRUCTURE_VOID
+  - DEBUG_STICK
+  - KNOWLEDGE_BOOK
+  - PLAYER_HEAD
+  - MOB_SPAWNER

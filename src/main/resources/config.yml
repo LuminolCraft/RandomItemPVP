@@ -1,0 +1,168 @@
+# ==========================================
+# RandomItemPVP 配置文件
+# ==========================================
+# 修改后使用指令 /ripvp reload 热加载配置
+# 新配置将在下一轮游戏开始时生效
+# ==========================================
+# 📌 重要提示：所有功能配置已模块化！
+# ==========================================
+# 所有配置现在都使用独立的模块化文件：
+#   - arena.yml      - 竞技场设置
+#   - border.yml     - 边界设置
+#   - events.yml     - 随机事件设置
+#   - database.yml   - 数据库设置
+#   - items.yml      - 物品权重配置
+#   - maps.yml       - 地图列表配置
+#
+# 💡 配置优先级：
+#   1. 模块化配置文件（插件启动时会自动从资源文件复制创建）
+#   2. 配置预设（如果使用）
+#   3. 本文件（config.yml）作为后备配置
+#
+# 💡 使用建议：
+#   1. 插件首次启动时会自动创建所有模块化配置文件
+#   2. 直接编辑模块化配置文件来管理各个功能模块（推荐）
+#   3. 模块化配置文件包含完整的配置和详细说明
+#   4. 使用 /ripvp reload 重载配置
+#
+# 📝 注意：本文件中的配置主要用于：
+#   - 提供默认配置值
+#   - 防止资源文件缺失时的后备
+#   - 向后兼容旧版本
+# ==========================================
+
+# 竞技场设置
+# 注意：完整的竞技场配置请查看 arena.yml 文件
+arena:
+  radius: 48            # 初始边界半径（格）
+  min-players: 2        # 最少玩家数才能开始
+  start-countdown: 30   # 准备倒计时（秒）
+  auto-start-delay: 5   # 达到最少玩家数后，延迟几秒再开始倒计时（秒，0=立即开始）
+  vote-duration: 15    # 地图投票持续时间（秒）
+  
+  # 世界实例化设置（多房间独立世界支持）
+  world-instancing:
+    enabled: true         # 是否启用世界实例化（每个房间使用独立的世界副本）
+    auto-cleanup: true    # 游戏结束后是否自动删除世界实例（true=删除，false=重置）
+    # 注意：Worlds 插件是必需依赖！插件启动时会检查 Worlds 插件，未安装则无法运行
+  
+  # 旧版兼容：游戏出生点（如果地图列表为空时使用）
+  spawn:
+    world: 'world'      # Worlds 插件的世界 key（必需）
+    x: 0.0              # X坐标
+    y: 64.0             # Y坐标
+    z: 0.0              # Z坐标
+    yaw: 0.0            # 视角偏航角
+    pitch: 0.0          # 视角俯仰角
+  
+  # 大厅设置（游戏结束后传送玩家回大厅）
+  lobby:
+    enabled: true       # 是否启用大厅传送（游戏结束后自动传送）
+    world: 'world'      # Worlds 插件的世界 key（必需）
+    x: 0.0              # X坐标
+    y: 64.0             # Y坐标
+    z: 0.0              # Z坐标
+    yaw: 0.0            # 视角偏航角
+    pitch: 0.0          # 视角俯仰角
+  
+  # 地图列表配置
+  # 注意：完整的地图列表配置请查看 maps.yml 文件
+  # 如果 maps.yml 存在，下面的配置将被忽略
+  maps: {}
+
+# 边界设置
+# 注意：完整的边界配置请查看 border.yml 文件
+border:
+  damage: 3.0                         # 穿越边界每秒扣血量（1.0 = 0.5颗心）
+  min_diameter: 10                    # 边界最小直径（格）
+  shrink_amount_per_interval: 6.0     # 每次缩圈减少的直径（格）
+  shrink_interval_ticks: 600          # 缩圈间隔（ticks，20ticks=1秒）
+  first_shrink_delay_ticks: 200       # 首次缩圈延迟（ticks）
+
+# 物品发放设置
+# ==========================================
+# 📌 重要提示：物品权重配置已模块化！
+# ==========================================
+# 物品权重配置现在使用独立的 items.yml 文件
+# 
+# 如果 items.yml 文件存在，插件会优先使用 items.yml 中的配置
+# 如果 items.yml 不存在，插件会使用下面的最小配置作为后备
+# ==========================================
+items:
+  interval_ticks: 100    # 物品发放间隔（ticks，100=5秒）
+  
+  # 最小后备配置（仅当 items.yml 不存在时使用）
+  # 完整的物品权重配置请查看 items.yml 文件
+  weights:
+    IRON_SWORD: 50       # 示例：铁剑
+    BOW: 50              # 示例：弓
+    ARROW: 60            # 示例：箭
+    GOLDEN_APPLE: 45     # 示例：金苹果
+    COBBLESTONE: 60      # 示例：圆石
+  
+  blacklist:             # 禁用的物品（与 items.yml 中的 blacklist 合并）
+    - AIR
+    - BEDROCK
+    - BARRIER
+    - COMMAND_BLOCK
+    - CHAIN_COMMAND_BLOCK
+    - REPEATING_COMMAND_BLOCK
+    - STRUCTURE_BLOCK
+    - JIGSAW
+    - STRUCTURE_VOID
+    - DEBUG_STICK
+
+# 随机事件设置
+# 注意：完整的随机事件配置请查看 events.yml 文件
+events:
+  delay_min_ticks: 600   # 随机事件最小延迟（ticks，正常情况）
+  delay_max_ticks: 2400  # 随机事件最大延迟（ticks，正常情况）
+  delay_min_ticks_final_circle: 200  # 最后一圈最小延迟（ticks，加快频率）
+  delay_max_ticks_final_circle: 600  # 最后一圈最大延迟（ticks，加快频率）
+  # 说明：当边界缩小到接近最小值时，事件会更频繁触发，增加紧张感
+
+# ==========================================
+# 数据库设置（存储玩家统计数据）
+# ==========================================
+# 注意：完整的数据库配置请查看 database.yml 文件
+database:
+  # 数据库类型：SQLITE 或 MYSQL
+  type: SQLITE
+  
+  # SQLite 设置（type=SQLITE时使用）
+  sqlite:
+    file: 'plugins/RandomItemPVP/data.db'  # 数据库文件路径
+  
+  # MySQL 设置（type=MYSQL时使用）
+  mysql:
+    host: 'localhost'           # 数据库地址
+    port: 3306                  # 数据库端口
+    database: 'randomitempvp'   # 数据库名
+    username: 'root'            # 用户名
+    password: 'password'        # 密码
+    
+    # 连接参数（高级设置）
+    properties:
+      useSSL: false                     # 是否使用SSL
+      autoReconnect: true               # 自动重连
+      serverTimezone: 'Asia/Shanghai'   # 服务器时区
+      allowPublicKeyRetrieval: true     # 允许公钥检索（MySQL 8.0+必须）
+      useTimezone: true                 # 使用时区
+    
+    # 连接池设置（HikariCP）
+    pool:
+      maximum-pool-size: 10             # 最大连接数
+      minimum-idle: 2                   # 最小空闲连接数
+      connection-timeout: 30000         # 连接超时（毫秒）
+      idle-timeout: 600000              # 空闲超时（毫秒）
+      max-lifetime: 1800000             # 最大生命周期（毫秒）
+
+# ==========================================
+# 时间换算参考：
+# 20 ticks = 1 秒
+# 100 ticks = 5 秒
+# 200 ticks = 10 秒
+# 600 ticks = 30 秒
+# 1200 ticks = 1 分钟
+# 2400 ticks = 2 分钟
+# ==========================================

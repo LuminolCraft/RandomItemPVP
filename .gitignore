@@ -1,0 +1,86 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+.settings/
+.classpath
+.project
+
+# Gradle
+build/
+.gradle/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Compiled
+*.class
+*.jar
+!gradle-wrapper.jar
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~
+
+# Test files
+测试文件/
+测试/
+temp/
+tmp/
+
+# Personal documentation
+*测试*.md
+*修复*.md
+*配置*.md
+*数据迁移*.md
+*导出*.md
+*部署*.md
+*连接*.md
+*远程*.md
+*验证*.md
+*Windows*.md
+*实现*.md
+*双数据库*.md
+*验证*.md
+*本次*.md
+*最终*.md
+*紧急*.md
+*修复说明.md
+*部署*.md
+*配置说明.md
+
+# Keep official docs
+!README.md
+!CHANGELOG.md
+!DATABASE_GUIDE.md
+!PLACEHOLDERAPI_GUIDE.md
+!CONFIG_RELOAD_DEBUG.md
+!GITHUB_RELEASE*.md
+!RELEASE_NOTES*.md
+
+
+
+
