@@ -143,25 +143,25 @@ weights:
   # 护甲 - 低权重
   # ==========================================
   
-  头盔（权重 6-12）
+  # 头盔（权重 6-12）
   IRON_HELMET: 12              # 铁头盔
   CHAINMAIL_HELMET: 10         # 锁链头盔
   LEATHER_HELMET: 8            # 皮革头盔
   GOLDEN_HELMET: 6             # 金头盔
   
-  胸甲（权重 6-12）
+  # 胸甲（权重 6-12）
   IRON_CHESTPLATE: 12          # 铁胸甲
   CHAINMAIL_CHESTPLATE: 10     # 锁链胸甲
   LEATHER_CHESTPLATE: 8        # 皮革胸甲
   GOLDEN_CHESTPLATE: 6         # 金胸甲
   
-  护腿（权重 6-12）
+  # 护腿（权重 6-12）
   IRON_LEGGINGS: 12            # 铁护腿
   CHAINMAIL_LEGGINGS: 10       # 锁链护腿
   LEATHER_LEGGINGS: 8          # 皮革护腿
   GOLDEN_LEGGINGS: 6           # 金护腿
   
-  靴子（权重 6-12）
+  # 靴子（权重 6-12）
   IRON_BOOTS: 12               # 铁靴子
   CHAINMAIL_BOOTS: 10          # 锁链靴子
   LEATHER_BOOTS: 8             # 皮革靴子
