@@ -595,7 +595,7 @@ public class ArenaManager {
                     Location mapSpawn = config.loadMapSpawnLocation(selectedMapId);
                     if (mapSpawn != null) {
                         // 检查地图是否已被其他房间锁定
-                        if (lockedMaps.containsKey(selectedMapId)) {
+                        if (lockedMaps.containsKey(selectedMapId) && !lockedMaps.get(selectedMapId).equals(arenaName)) {
                             String lockingArena = lockedMaps.get(selectedMapId);
                             sendMessageToArena(arenaName, "§c[房间 " + arenaName + "] 地图 " + config.getMapName(selectedMapId) + " 已被房间 " + lockingArena + " 锁定，无法使用");
                             // 随机选择其他地图
@@ -659,7 +659,7 @@ public class ArenaManager {
                     Location mapSpawn = config.loadMapSpawnLocation(selectedMapId);
                     if (mapSpawn != null) {
                         // 检查地图是否已被其他房间锁定
-                        if (lockedMaps.containsKey(selectedMapId)) {
+                        if (lockedMaps.containsKey(selectedMapId) && !lockedMaps.get(selectedMapId).equals(arena.getArenaName())) {
                             String lockingArena = lockedMaps.get(selectedMapId);
                             sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 地图 " + config.getMapName(selectedMapId) + " 已被房间 " + lockingArena + " 锁定，无法使用");
                             // 随机选择其他地图
