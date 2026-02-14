@@ -128,8 +128,7 @@ public class AirdropManager implements Listener {
         
         originalBlocks.put(beaconBase, originalBlock);
         
-        // 记录信标和箱子的原始状态到 MapResetManager
-        recordAirdropBlocks(beaconBase, location);
+
         
         beaconBase.getBlock().setType(Material.BEACON);
         location.getBlock().setType(Material.CHEST);
@@ -265,84 +264,36 @@ public class AirdropManager implements Listener {
      */
     private void clearAirdropChests() {
         // 方块操作必须在区域调度器中执行（Folia 要求）
-        // 但如果插件已禁用（服务器关闭），则直接同步执行
+        // 但如果插件已禁用（服务器关闭），则跳过区块操作，只清理集合
         for (Location loc : airdropChests) {
             if (plugin.isEnabled()) {
                 // 插件运行中，使用区域调度器（线程安全）
                 Bukkit.getRegionScheduler().run(plugin, loc, task -> {
-                    if (loc.getBlock().getType() == Material.CHEST) {
-                        loc.getBlock().setType(Material.AIR);
-                    }
-                    // 恢复信标底座的原始方块
-                    Location below = loc.clone().subtract(0, 1, 0);
-                    if (below.getBlock().getType() == Material.BEACON) {
-                        Material original = originalBlocks.getOrDefault(below, Material.AIR);
-                        below.getBlock().setType(original);
+                    try {
+                        // 检查世界是否有效
+                        if (loc.getWorld() == null) {
+                            return;
+                        }
+                        if (loc.getBlock().getType() == Material.CHEST) {
+                            loc.getBlock().setType(Material.AIR);
+                        }
+                        // 恢复信标底座的原始方块
+                        Location below = loc.clone().subtract(0, 1, 0);
+                        if (below.getWorld() != null && below.getBlock().getType() == Material.BEACON) {
+                            Material original = originalBlocks.getOrDefault(below, Material.AIR);
+                            below.getBlock().setType(original);
+                        }
+                    } catch (Exception e) {
+                        // 捕获所有异常，确保清理过程不会中断
                     }
                 });
-            } else {
-                // 插件已禁用（服务器关闭），直接同步执行
-                if (loc.getBlock().getType() == Material.CHEST) {
-                    loc.getBlock().setType(Material.AIR);
-                }
-                // 恢复信标底座的原始方块
-                Location below = loc.clone().subtract(0, 1, 0);
-                if (below.getBlock().getType() == Material.BEACON) {
-                    Material original = originalBlocks.getOrDefault(below, Material.AIR);
-                    below.getBlock().setType(original);
-                }
             }
         }
         airdropChests.clear();
         originalBlocks.clear(); // 清除原始方块记录
     }
     
-    /**
-     * 记录空投箱和信标到 MapResetManager
-     */
-    private void recordAirdropBlocks(Location beaconBase, Location chestLoc) {
-        if (!(plugin instanceof RandomItemPVP)) {
-            return;
-        }
-        
-        // 通过位置查找对应的房间和 GameInstance
-        RandomItemPVP pluginInstance = (RandomItemPVP) plugin;
-        ArenaManager arenaManager = pluginInstance.getArenaManager();
-        if (arenaManager == null) {
-            return;
-        }
-        
-        // 查找包含这些位置的房间
-        for (GameArena arena : arenaManager.getAllArenas()) {
-            if (arena.getWorld() != null && arena.getWorld().equals(beaconBase.getWorld())) {
-                Location spawnLoc = arena.getSpawnLocation();
-                if (spawnLoc != null) {
-                    ConfigManager config = arenaManager.getConfig();
-                    if (config != null) {
-                        double radius = config.getArenaRadius();
-                        if (beaconBase.distance(spawnLoc) <= radius) {
-                            // 找到了对应的房间，记录方块
-                            GameInstance instance = arena.getGameInstance();
-                            if (instance != null && instance.isRunning()) {
-                                // 记录信标（在放置前记录原始状态）
-                                org.bukkit.block.Block beaconBlock = beaconBase.getBlock();
-                                org.bukkit.block.BlockState originalBeaconState = beaconBlock.getState();
-                                instance.recordBlockPlace(beaconBlock, originalBeaconState);
-                                
-                                // 记录箱子（在放置前记录原始状态）
-                                org.bukkit.block.Block chestBlock = chestLoc.getBlock();
-                                org.bukkit.block.BlockState originalChestState = chestBlock.getState();
-                                instance.recordBlockPlace(chestBlock, originalChestState);
-                                
-                                plugin.getLogger().info("[空投系统] 已记录空投箱和信标到地图重置系统: " + chestLoc);
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+
     
     /**
      * 为指定房间投放空投
@@ -352,9 +303,25 @@ public class AirdropManager implements Listener {
         
         // 获取当前边界大小，确保空投掉落在边界内
         WorldBorder border = world.getWorldBorder();
-        double currentRadius = border.getSize() / 2.0;
+        double currentSize = border.getSize();
+        
+        // 检查边界是否已缩小到最小范围
+        if (plugin instanceof RandomItemPVP) {
+            ArenaManager arenaManager = ((RandomItemPVP) plugin).getArenaManager();
+            if (arenaManager != null) {
+                ConfigManager config = arenaManager.getConfig();
+                if (config != null) {
+                    double minSize = config.getMinBorderSize();
+                    // 如果边界已达到最小大小，不再刷新空投
+                    if (currentSize <= minSize) {
+                        return;
+                    }
+                }
+            }
+        }
         
         // 空投范围为当前边界的 70%（留出安全边距）
+        double currentRadius = currentSize / 2.0;
         int maxOffset = (int) (currentRadius * 0.7);
         if (maxOffset < 10) maxOffset = 10; // 最小范围 10 格
         

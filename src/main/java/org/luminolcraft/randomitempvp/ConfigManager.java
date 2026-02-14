@@ -36,6 +36,10 @@ public class ConfigManager {
     private FileConfiguration mapsModule;
     private File alliesModuleFile;
     private FileConfiguration alliesModule;
+    private File arenasModuleFile;
+    private FileConfiguration arenasModule;
+    private File mapResetModuleFile;
+    private FileConfiguration mapResetModule;
 
     public ConfigManager(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -78,6 +82,12 @@ public class ConfigManager {
 
         alliesModuleFile = new File(plugin.getDataFolder(), "config-modules/allies.yml");
         alliesModule = loadModule(alliesModuleFile, "config-modules/allies.yml", "allies.yml", statuses);
+
+        arenasModuleFile = new File(plugin.getDataFolder(), "config-modules/arenas.yml");
+        arenasModule = loadModule(arenasModuleFile, "config-modules/arenas.yml", "arenas.yml", statuses);
+
+        mapResetModuleFile = new File(plugin.getDataFolder(), "config-modules/map-reset.yml");
+        mapResetModule = loadModule(mapResetModuleFile, "config-modules/map-reset.yml", "map-reset.yml", statuses);
 
         if (verbose) {
             plugin.getLogger().info("模块化配置热加载完成 -> " + String.join(", ", statuses));
@@ -349,8 +359,21 @@ public class ConfigManager {
 
         World world = Bukkit.getWorld(worldName);
         if (world == null) {
-            plugin.getLogger().warning("地图 '" + mapId + "' 的世界 '" + worldName + "' 不存在！");
-            return null;
+            // 尝试使用 Worlds 插件加载世界
+            try {
+                world = WorldsIntegration.loadWorld(worldName);
+                if (world == null) {
+                    // 如果 Worlds 插件加载失败，尝试使用 Bukkit API 加载
+                    world = Bukkit.createWorld(new org.bukkit.WorldCreator(worldName));
+                }
+            } catch (Exception e) {
+                plugin.getLogger().warning("尝试加载世界 '" + worldName + "' 时出错: " + e.getMessage());
+            }
+            
+            if (world == null) {
+                plugin.getLogger().warning("地图 '" + mapId + "' 的世界 '" + worldName + "' 不存在！");
+                return null;
+            }
         }
 
         double x = section.getDouble("x", 0.0);
@@ -450,6 +473,88 @@ public class ConfigManager {
             return section.getInt("vote-duration");
         }
         return getVoteDuration();
+    }
+    
+    /**
+     * 加载地图的准备房间位置配置
+     * @param mapId 地图ID
+     * @return 准备房间位置，如果未配置则返回null
+     */
+    public Location loadMapLobbyLocation(String mapId) {
+        ConfigurationSection section = getMapSection(mapId);
+        if (section == null) {
+            return null;
+        }
+        
+        // 检查是否有lobby配置
+        ConfigurationSection lobbySection = section.getConfigurationSection("lobby");
+        if (lobbySection == null) {
+            return null;
+        }
+        
+        // 读取准备房间位置
+        String worldName = lobbySection.getString("world");
+        if (worldName == null) {
+            // 如果未配置世界，则使用地图的世界
+            worldName = section.getString("world");
+            if (worldName == null) {
+                return null;
+            }
+        }
+        
+        World world = Bukkit.getWorld(worldName);
+        if (world == null) {
+            plugin.getLogger().warning("地图 '" + mapId + "' 的准备房间世界 '" + worldName + "' 不存在！");
+            return null;
+        }
+        
+        // 读取坐标，如果未配置则使用地图的坐标
+        double x = lobbySection.getDouble("x", section.getDouble("x", 0.0));
+        double y = lobbySection.getDouble("y", section.getDouble("y", 64.0));
+        double z = lobbySection.getDouble("z", section.getDouble("z", 0.0));
+        float yaw = (float) lobbySection.getDouble("yaw", section.getDouble("yaw", 0.0));
+        float pitch = (float) lobbySection.getDouble("pitch", section.getDouble("pitch", 0.0));
+        
+        return new Location(world, x, y, z, yaw, pitch);
+    }
+    
+    /**
+     * 加载房间特定的准备房间位置配置
+     * @param arenaName 房间名
+     * @return 准备房间位置，如果未配置则返回null
+     */
+    public Location loadArenaLobbyLocation(String arenaName) {
+        // 检查mapsModule中是否有房间特定的配置
+        if (mapsModule != null) {
+            // 检查是否有arena_<房间名>配置
+            String configKey = "arena_" + arenaName;
+            ConfigurationSection arenaSection = mapsModule.getConfigurationSection(configKey);
+            if (arenaSection != null) {
+                ConfigurationSection lobbySection = arenaSection.getConfigurationSection("lobby");
+                if (lobbySection != null) {
+                    // 读取房间特定的准备房间位置
+                    String worldName = lobbySection.getString("world");
+                    if (worldName == null) {
+                        return null;
+                    }
+                    
+                    World world = Bukkit.getWorld(worldName);
+                    if (world == null) {
+                        plugin.getLogger().warning("房间 '" + arenaName + "' 的准备房间世界 '" + worldName + "' 不存在！");
+                        return null;
+                    }
+                    
+                    double x = lobbySection.getDouble("x", 0.0);
+                    double y = lobbySection.getDouble("y", 64.0);
+                    double z = lobbySection.getDouble("z", 0.0);
+                    float yaw = (float) lobbySection.getDouble("yaw", 0.0);
+                    float pitch = (float) lobbySection.getDouble("pitch", 0.0);
+                    
+                    return new Location(world, x, y, z, yaw, pitch);
+                }
+            }
+        }
+        return null;
     }
 
     public boolean hasItemsConfig() {
@@ -587,4 +692,114 @@ public class ConfigManager {
         }
         return config.getDouble("allies.behavior.damage_multiplier", 1.2);
     }
+    
+    // ==========================================
+    // 固定房间配置读取方法
+    // ==========================================
+    
+    /**
+     * 获取所有固定房间的名称列表
+     * @return 固定房间名称列表
+     */
+    public List<String> getFixedArenas() {
+        List<String> arenas = new ArrayList<>();
+        if (arenasModule != null) {
+            for (String key : arenasModule.getKeys(false)) {
+                if (arenasModule.isConfigurationSection(key)) {
+                    // 检查房间是否启用
+                    if (arenasModule.getBoolean(key + ".enabled", true)) {
+                        arenas.add(key);
+                    }
+                }
+            }
+        }
+        return arenas;
+    }
+    
+    /**
+     * 检查房间是否为固定房间
+     * @param arenaName 房间名
+     * @return 是否为固定房间
+     */
+    public boolean isFixedArena(String arenaName) {
+        if (arenasModule == null) {
+            return false;
+        }
+        return arenasModule.isConfigurationSection(arenaName) && 
+               arenasModule.getBoolean(arenaName + ".enabled", true);
+    }
+    
+    /**
+     * 获取固定房间的默认地图
+     * @param arenaName 房间名
+     * @return 默认地图ID，如果未配置则返回null
+     */
+    public String getFixedArenaDefaultMap(String arenaName) {
+        if (arenasModule == null || !arenasModule.isConfigurationSection(arenaName)) {
+            return null;
+        }
+        return arenasModule.getString(arenaName + ".map");
+    }
+    
+    // ==========================================
+    // 地图重置配置读取方法
+    // ==========================================
+    
+    /**
+     * 检查是否启用地图重置
+     */
+    public boolean isMapResetEnabled() {
+        return readBoolean(mapResetModule, "enabled", "map-reset.enabled", true);
+    }
+    
+
+    /**
+     * 获取地图重置的批处理大小
+     */
+    public int getMapResetBatchSize() {
+        return readInt(mapResetModule, "batch-size", "map-reset.batch-size", 500);
+    }
+    
+    /**
+     * 获取地图重置的批处理延迟（ticks）
+     */
+    public int getMapResetDelay() {
+        return readInt(mapResetModule, "delay", "map-reset.delay", 2);
+    }
+    
+    /**
+     * 检查是否启用地图重置保护
+     */
+    public boolean isMapResetProtectionEnabled() {
+        return readBoolean(mapResetModule, "protection", "map-reset.protection", true);
+    }
+    
+    /**
+     * 检查是否启用地图重置数据持久化
+     */
+    public boolean isMapResetPersistenceEnabled() {
+        return readBoolean(mapResetModule, "persistence", "map-reset.persistence", true);
+    }
+    
+    /**
+     * 检查是否在热加载时自动保存初始状态
+     */
+    public boolean isMapResetSaveOnLoad() {
+        return readBoolean(mapResetModule, "save-on-load", "map-reset.save-on-load", true);
+    }
+    
+    /**
+     * 检查是否在游戏结束时自动重置地图
+     */
+    public boolean isMapResetOnGameEnd() {
+        return readBoolean(mapResetModule, "reset-on-game-end", "map-reset.reset-on-game-end", true);
+    }
+    
+    /**
+     * 检查是否在重置后清理残留的流动水
+     */
+    public boolean isMapResetPostClearFlowing() {
+        return readBoolean(mapResetModule, "post-reset-clear-flowing", "map-reset.post-reset-clear-flowing", true);
+    }
 }
+

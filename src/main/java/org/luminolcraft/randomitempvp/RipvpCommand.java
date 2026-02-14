@@ -59,7 +59,7 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
             switch (args[0].toLowerCase()) {
                 case "start": {
                     if (player == null) return true;
-                    if (!player.hasPermission("ripvp.use")) {
+                    if (!player.hasPermission("ripvp.admin")) {
                         player.sendMessage(ChatColor.RED + "你没有权限使用此命令！");
                         return true;
                     }
@@ -69,18 +69,12 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                         String startArenaName = args[1];
                         GameArena startArena = arenaManager.getArena(startArenaName);
                         
-                        // 如果房间不存在，自动创建（启动投票）
+                        // 如果房间不存在，显示错误消息
                         if (startArena == null) {
-                            if (arenaManager.createArena(startArenaName, player)) {
-                                player.sendMessage(ChatColor.GREEN + "房间 '§6" + startArenaName + "§a' 已创建！地图投票已开始！");
-                                player.sendMessage(ChatColor.YELLOW + "使用 /ripvp vote <地图名> 投票选择地图");
-                            } else {
-                                player.sendMessage(ChatColor.RED + "创建房间失败！");
-                                return true;
-                            }
-                            
-                            // 重新获取房间（因为刚刚创建）
-                            startArena = arenaManager.getArena(startArenaName);
+                            player.sendMessage(ChatColor.RED + "房间 '" + startArenaName + "' 不存在！");
+                            player.sendMessage(ChatColor.YELLOW + "使用 /ripvp create <房间名> 创建房间");
+                            player.sendMessage(ChatColor.GRAY + "使用 /ripvp list 查看所有可用房间");
+                            return true;
                         }
                         
                         // 检查房间状态
@@ -124,9 +118,8 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                     if (playerArenaName == null) {
                         player.sendMessage(ChatColor.RED + "你没有在任何房间中！");
                         player.sendMessage(ChatColor.YELLOW + "使用以下方式开始游戏：");
-                        player.sendMessage(ChatColor.WHITE + "  1. /ripvp start <房间名> - 创建并启动指定房间");
-                        player.sendMessage(ChatColor.WHITE + "  2. /ripvp create <房间名> - 创建房间，然后使用 /ripvp start <房间名> 启动");
-                        player.sendMessage(ChatColor.WHITE + "  3. /ripvp join <房间名> - 加入已有房间，然后等待管理员启动");
+                        player.sendMessage(ChatColor.WHITE + "  1. /ripvp start <房间名> - 启动指定房间的游戏");
+                        player.sendMessage(ChatColor.WHITE + "  2. /ripvp join <房间名> - 加入已有房间，然后等待管理员启动");
                         player.sendMessage(ChatColor.GRAY + "使用 /ripvp list 查看所有可用房间");
                         return true;
                     }
@@ -235,10 +228,11 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                     }
                     // 显示所有房间状态
                     Set<String> statusArenaNames = arenaManager.getArenaNames();
-                    if (statusArenaNames.isEmpty()) {
-                        sender.sendMessage(ChatColor.YELLOW + "当前没有房间！");
-                        return true;
-                    }
+            if (statusArenaNames.isEmpty()) {
+                sender.sendMessage(ChatColor.YELLOW + "当前没有房间！");
+                sender.sendMessage(ChatColor.YELLOW + "请在 config-modules/arenas.yml 中配置固定房间");
+                return true;
+            }
                     sender.sendMessage(ChatColor.AQUA + "===== 所有房间状态 =====");
                     for (String name : statusArenaNames) {
                         GameArena statusArena = arenaManager.getArena(name);
@@ -277,6 +271,10 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                     // 热加载配置
                     List<String> reloadedFiles = configManager.reloadConfig();
                     
+                     // 重新加载房间配置
+                    arenaManager.loadArenas();
+                    List<String> fixedArenas = configManager.getFixedArenas();
+                    
                     // 显示重载信息
                     sender.sendMessage(ChatColor.GREEN + "✓ 配置文件已热加载！");
                     sender.sendMessage(ChatColor.AQUA + "当前配置：");
@@ -295,11 +293,17 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                     if (!reloadedFiles.isEmpty()) {
                         sender.sendMessage(ChatColor.GRAY + "  - 已读取文件: " + ChatColor.YELLOW + String.join(ChatColor.GRAY + ", " + ChatColor.YELLOW, reloadedFiles));
                     }
+                    if (!fixedArenas.isEmpty()) {
+                        sender.sendMessage(ChatColor.GRAY + "  - 已加载房间: " + ChatColor.YELLOW + String.join(ChatColor.GRAY + ", " + ChatColor.YELLOW, fixedArenas));
+                    }
                     sender.sendMessage(ChatColor.YELLOW + "新配置已生效，可以开始新游戏。");
 
                     RandomItemPVP pluginInstance = RandomItemPVP.getInstance();
                     if (pluginInstance != null) {
                         pluginInstance.getLogger().info("配置热加载完成 -> " + String.join(", ", reloadedFiles));
+                        if (!fixedArenas.isEmpty()) {
+                            pluginInstance.getLogger().info("已重新加载 " + fixedArenas.size() + " 个固定房间：" + String.join(", ", fixedArenas));
+                        }
                     }
                     return true;
                 }
@@ -382,48 +386,7 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 
-                case "create": {
-                    if (!sender.hasPermission("ripvp.admin")) {
-                        sender.sendMessage(ChatColor.RED + "你没有权限使用此命令！");
-                        return true;
-                    }
-                    if (args.length < 2) {
-                        sender.sendMessage(ChatColor.RED + "用法：/ripvp create <房间名>");
-                        return true;
-                    }
-                    String createArenaName = args[1];
-                    Player creator = (sender instanceof Player) ? (Player) sender : null;
-                    if (arenaManager.createArena(createArenaName, creator)) {
-                        sender.sendMessage(ChatColor.GREEN + "✓ 房间 '" + createArenaName + "' 已创建！");
-                        if (creator != null) {
-                            sender.sendMessage(ChatColor.GREEN + "✓ 地图投票已开始！");
-                            sender.sendMessage(ChatColor.GREEN + "✓ 你已自动加入房间！");
-                            sender.sendMessage(ChatColor.YELLOW + "使用 /ripvp vote <地图名> 投票选择地图");
-                            
-                            // 显示可用地图
-                            RandomItemPVP pluginInstance = RandomItemPVP.getInstance();
-                            if (pluginInstance != null) {
-                                MapVoteManager voteManager = pluginInstance.getMapVoteManager();
-                                if (voteManager != null && voteManager.isVoting(createArenaName)) {
-                                    Map<String, Integer> voteResults = voteManager.getVoteResults(createArenaName);
-                                    if (!voteResults.isEmpty()) {
-                                        StringBuilder mapList = new StringBuilder("§a可用地图：");
-                                        for (String mapId : voteResults.keySet()) {
-                                            String mapName = configManager.getMapName(mapId);
-                                            mapList.append(" §e").append(mapName).append("§7(/ripvp vote ").append(mapId).append(")");
-                                        }
-                                        sender.sendMessage(mapList.toString());
-                                    }
-                                }
-                            }
-                        } else {
-                            sender.sendMessage(ChatColor.YELLOW + "提示：玩家可以使用 /ripvp join " + createArenaName + " 加入房间");
-                        }
-                    } else {
-                        sender.sendMessage(ChatColor.RED + "房间 '" + createArenaName + "' 已存在！");
-                    }
-                    return true;
-                }
+
                 
                 case "delete": {
                     if (!sender.hasPermission("ripvp.admin")) {
@@ -473,14 +436,38 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                         return true;
                     }
                     
-                    // 检查房间是否正在投票
-                    if (!voteManager.isVoting(voteArenaName)) {
-                        player.sendMessage(ChatColor.RED + "房间 '" + voteArenaName + "' 的投票已结束！");
-                        return true;
-                    }
+
                     
                     // 投票（支持弃票）
                     String voteMapId = args[1];
+                    
+                    // 检查房间是否正在投票
+                    if (!voteManager.isVoting(voteArenaName)) {
+                        // 投票已结束，重新开始投票
+                        RandomItemPVP pluginInstance2 = RandomItemPVP.getInstance();
+                        if (pluginInstance2 != null) {
+                            GameArena voteArena = arenaManager.getArena(voteArenaName);
+                            if (voteArena != null && !voteArena.isRunning() && !voteArena.isPreparing()) {
+                                // 重新开始投票
+                                int playerCount = voteArena.getPlayerCount();
+                                int minPlayers = configManager.getMinPlayers();
+                                if (voteManager.startVote(voteArenaName, playerCount, minPlayers)) {
+                                    player.sendMessage(ChatColor.GREEN + "房间 '" + voteArenaName + "' 的投票已重新开始！");
+                                    // 再次执行投票
+                                    if (voteManager.vote(voteArenaName, player, voteMapId)) {
+                                        // 投票成功消息已在 voteManager 中发送
+                                    } else {
+                                        player.sendMessage(ChatColor.RED + "投票失败！请检查地图名是否正确。");
+                                    }
+                                } else {
+                                    player.sendMessage(ChatColor.RED + "无法重新开始投票！");
+                                }
+                            } else {
+                                player.sendMessage(ChatColor.RED + "房间状态不允许重新投票！");
+                            }
+                        }
+                        return true;
+                    }
                     if (voteManager.vote(voteArenaName, player, voteMapId)) {
                         // 投票成功消息已在 voteManager 中发送
                     } else {
@@ -494,7 +481,7 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                     Set<String> listArenaNames = arenaManager.getArenaNames();
                     if (listArenaNames.isEmpty()) {
                         sender.sendMessage(ChatColor.YELLOW + "当前没有可用房间！");
-                        sender.sendMessage(ChatColor.GRAY + "使用 /ripvp create <房间名> 创建房间");
+                        sender.sendMessage(ChatColor.YELLOW + "请在 config-modules/arenas.yml 中配置固定房间");
                         return true;
                     }
                     sender.sendMessage(ChatColor.AQUA + "===== 可用房间 =====");
@@ -614,6 +601,55 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 
+                case "savemap": {
+                    if (player == null) return true;
+                    if (!player.hasPermission("ripvp.admin")) {
+                        player.sendMessage(ChatColor.RED + "你没有权限使用此命令！");
+                        return true;
+                    }
+                    // 手动记录地图
+                    if (args.length < 2) {
+                        player.sendMessage(ChatColor.RED + "请指定地图ID！例如：/ripvp savemap map1");
+                        return true;
+                    }
+                    
+                    String mapId = args[1];
+                    
+                    // 检查地图是否存在
+                    if (!configManager.mapExists(mapId)) {
+                        player.sendMessage(ChatColor.RED + "地图ID '" + mapId + "' 不存在！请检查maps.yml文件中的配置");
+                        return true;
+                    }
+                    
+                    // 加载地图配置
+                    org.bukkit.Location center = configManager.loadMapSpawnLocation(mapId);
+                    if (center == null) {
+                        player.sendMessage(ChatColor.RED + "加载地图坐标失败！请检查maps.yml文件中地图 '" + mapId + "' 的配置");
+                        return true;
+                    }
+                    
+                    int radius = configManager.getMapRadius(mapId);
+                    String worldName = center.getWorld().getName();
+                    
+                    // 创建MapResetter实例并保存初始状态
+                    org.bukkit.World world = center.getWorld();
+                    MapResetter mapResetter = new MapResetter(RandomItemPVP.getInstance(), world, center, radius, mapId);
+                    mapResetter.saveInitialMapState(true); // 强制保存，即使文件已存在
+                    
+                    player.sendMessage(ChatColor.GREEN + "✓ 地图记录完成！");
+                    player.sendMessage(ChatColor.YELLOW + "世界：" + worldName);
+                    player.sendMessage(ChatColor.YELLOW + "地图ID：" + mapId);
+                    player.sendMessage(ChatColor.YELLOW + "地图名称：" + configManager.getMapName(mapId));
+                    player.sendMessage(ChatColor.YELLOW + "记录中心：" + 
+                        String.format("X=%.1f, Y=%.1f, Z=%.1f", 
+                        center.getX(),
+                        center.getY(),
+                        center.getZ()));
+                    player.sendMessage(ChatColor.YELLOW + "记录半径：" + radius + "格");
+                    player.sendMessage(ChatColor.GRAY + "提示：地图数据已保存为JSON文件，下次游戏将直接使用此数据");
+                    return true;
+                }
+                
                 case "stats": {
                     if (player == null) return true;
                     // 查看自己的统计或指定玩家的统计
@@ -639,6 +675,84 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                     showLeaderboard(player, rankType);
                     return true;
                 }
+                
+                case "ready": {
+                    if (player == null) return true;
+                    if (!player.hasPermission("ripvp.use")) {
+                        player.sendMessage(ChatColor.RED + "你没有权限使用此命令！");
+                        return true;
+                    }
+                    
+                    // 检查玩家是否在房间中
+                    String readyArenaName = arenaManager.getPlayerArena(player);
+                    if (readyArenaName == null) {
+                        player.sendMessage(ChatColor.RED + "你没有在任何房间中！");
+                        player.sendMessage(ChatColor.YELLOW + "使用 /ripvp join <房间名> 加入房间");
+                        return true;
+                    }
+                    
+                    GameArena readyArena = arenaManager.getArena(readyArenaName);
+                    if (readyArena == null) {
+                        player.sendMessage(ChatColor.RED + "房间不存在！");
+                        return true;
+                    }
+                    
+                    GameInstance readyInstance = readyArena.getGameInstance();
+                    if (readyInstance.isRunning()) {
+                        player.sendMessage(ChatColor.RED + "游戏已经开始，无法准备！");
+                        return true;
+                    }
+                    
+                    if (!readyInstance.isPreparing()) {
+                        player.sendMessage(ChatColor.RED + "游戏未在准备中，无法准备！");
+                        player.sendMessage(ChatColor.YELLOW + "使用 /ripvp start <房间名> 启动游戏");
+                        return true;
+                    }
+                    
+                    // 执行准备操作
+                    if (readyInstance.ready(player)) {
+                        // 准备成功消息已在 ready() 方法中发送
+                    } else {
+                        player.sendMessage(ChatColor.RED + "准备失败！");
+                    }
+                    return true;
+                }
+                
+                case "unready": {
+                    if (player == null) return true;
+                    if (!player.hasPermission("ripvp.use")) {
+                        player.sendMessage(ChatColor.RED + "你没有权限使用此命令！");
+                        return true;
+                    }
+                    
+                    // 检查玩家是否在房间中
+                    String unreadyArenaName = arenaManager.getPlayerArena(player);
+                    if (unreadyArenaName == null) {
+                        player.sendMessage(ChatColor.RED + "你没有在任何房间中！");
+                        player.sendMessage(ChatColor.YELLOW + "使用 /ripvp join <房间名> 加入房间");
+                        return true;
+                    }
+                    
+                    GameArena unreadyArena = arenaManager.getArena(unreadyArenaName);
+                    if (unreadyArena == null) {
+                        player.sendMessage(ChatColor.RED + "房间不存在！");
+                        return true;
+                    }
+                    
+                    GameInstance unreadyInstance = unreadyArena.getGameInstance();
+                    if (unreadyInstance.isRunning()) {
+                        player.sendMessage(ChatColor.RED + "游戏已经开始，无法取消准备！");
+                        return true;
+                    }
+                    
+                    // 执行取消准备操作
+                    if (unreadyInstance.unready(player)) {
+                        // 取消准备成功消息已在 unready() 方法中发送
+                    } else {
+                        player.sendMessage(ChatColor.RED + "取消准备失败！");
+                    }
+                    return true;
+                }
 
                 default:
                     sendHelp(sender);
@@ -653,7 +767,7 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("start", "stop", "join", "leave", "cancel", "create", "delete", "list", "setspawn", "status", "reload", "stats", "top", "vote", "remap");
+            return Arrays.asList("start", "stop", "join", "leave", "cancel", "delete", "list", "setspawn", "status", "reload", "stats", "top", "vote", "remap", "ready", "unready");
         } else if (args.length == 2) {
             switch (args[0].toLowerCase()) {
                 case "start":
@@ -694,7 +808,9 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                     }
                     return null;
                 case "reload":
-                    // reload 命令不需要参数
+                case "ready":
+                case "unready":
+                    // 这些命令不需要参数
                     return new ArrayList<>();
             }
         }
@@ -723,18 +839,19 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
         
         sender.sendMessage(ChatColor.YELLOW + "===== /ripvp 命令帮助 =====");
         sender.sendMessage(ChatColor.GREEN + "玩家命令：");
-        sender.sendMessage(ChatColor.WHITE + "  /ripvp start [房间名] - 发起游戏或开启房间（房间不存在时自动创建）");
+        sender.sendMessage(ChatColor.WHITE + "  /ripvp start [房间名] - 发起游戏或开启房间");
         sender.sendMessage(ChatColor.WHITE + "  /ripvp join [房间名] - 加入游戏或房间");
         sender.sendMessage(ChatColor.WHITE + "  /ripvp leave - 退出游戏或房间");
         sender.sendMessage(ChatColor.WHITE + "  /ripvp list - 查看所有房间");
         sender.sendMessage(ChatColor.WHITE + "  /ripvp vote <地图名> - 投票选择地图（在房间中时）");
+        sender.sendMessage(ChatColor.WHITE + "  /ripvp ready - 准备游戏（在准备房间中时）");
+        sender.sendMessage(ChatColor.WHITE + "  /ripvp unready - 取消准备（在准备房间中时）");
         sender.sendMessage(ChatColor.WHITE + "  /ripvp status - 查看游戏状态");
         sender.sendMessage(ChatColor.WHITE + "  /ripvp stats [玩家] - 查看统计数据");
         sender.sendMessage(ChatColor.WHITE + "  /ripvp top [wins|kills|kd] - 查看排行榜");
         
         if (isAdmin) {
             sender.sendMessage(ChatColor.RED + "管理员命令：");
-            sender.sendMessage(ChatColor.WHITE + "  /ripvp create <房间名> - 创建房间（控制台可用）");
             sender.sendMessage(ChatColor.WHITE + "  /ripvp delete <房间名> - 删除房间（控制台可用）");
             sender.sendMessage(ChatColor.WHITE + "  /ripvp remap [地图名] - 重新选择地图（准备阶段）");
             sender.sendMessage(ChatColor.WHITE + "  /ripvp setspawn [房间名] - 设置游戏出生点");

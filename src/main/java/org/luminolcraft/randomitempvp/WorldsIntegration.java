@@ -653,7 +653,7 @@ public class WorldsIntegration {
             // 注意：Worlds 插件可能自动生成世界名，而不是使用我们提供的 instanceKey
             // 所以我们需要通过 findFreeName 生成一个唯一名称，或者接受 Worlds 插件生成的名称
             java.util.function.Consumer<Object> consumer = builderCandidate ->
-                configureCloneBuilder(builderCandidate, instanceKey, templateKey);
+                configureCloneBuilder(builderCandidate, instanceKey, instanceKey);
             
             Object result = methodGetOrCreateWorldInstance.invoke(worldsApi, templateWorld, consumer, true);
             

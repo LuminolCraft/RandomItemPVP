@@ -3,6 +3,7 @@ package org.luminolcraft.randomitempvp;
 import org.bukkit.Bukkit;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.plugin.java.JavaPlugin;
+import java.util.List;
 
 public final class RandomItemPVP extends JavaPlugin {
     private static RandomItemPVP instance;
@@ -35,9 +36,6 @@ public final class RandomItemPVP extends JavaPlugin {
         
         // 初始化房间管理器
         arenaManager = new ArenaManager(this, configManager, playerStatsManager);
-        
-        // 初始化 Worlds 插件集成（必须在其他初始化之前）
-        WorldsIntegration.initialize();
         
         // 初始化地图投票管理器
         mapVoteManager = new MapVoteManager(this, configManager);
@@ -83,35 +81,20 @@ public final class RandomItemPVP extends JavaPlugin {
             getLogger().info("未检测到 PlaceholderAPI，变量功能将不可用。");
         }
 
-        // 检查 Worlds 插件是否可用
-        if (!WorldsIntegration.isWorldsAvailable()) {
-            getLogger().warning("============================================");
-            getLogger().warning("Worlds 插件未安装或 API 初始化失败！");
-            getLogger().warning("世界实例化功能将不可用，但插件可以继续运行。");
-            getLogger().warning("Worlds 插件下载: https://modrinth.com/plugin/worlds-1");
-            getLogger().warning("============================================");
-            getLogger().info("插件将继续运行，但某些功能可能受限。");
+
+        
+        // 加载固定房间配置
+        arenaManager.loadArenas();
+        List<String> fixedArenas = configManager.getFixedArenas();
+        if (!fixedArenas.isEmpty()) {
+            getLogger().info("已加载 " + fixedArenas.size() + " 个固定房间：" + String.join(", ", fixedArenas));
         } else {
-            // 检查是否有可用的方法
-            if (!WorldsIntegration.hasAvailableMethods()) {
-                getLogger().warning("============================================");
-                getLogger().warning("Worlds 插件已安装，但无法找到所需的 API 方法！");
-                getLogger().warning("世界实例化功能（克隆/删除世界）将不可用。");
-                getLogger().warning("插件将继续运行，但某些功能可能受限。");
-                getLogger().warning("============================================");
-            } else {
-                getLogger().info("检测到 Worlds 插件，已启用多世界支持！");
-                getLogger().info("提示：可以在配置文件中使用 Worlds 插件的世界 key 来引用地图");
-            }
+            getLogger().info("未配置固定房间，请在 config-modules/arenas.yml 中配置");
         }
-        
-        // 列出可用的方法（用于调试）
-        if (getLogger().isLoggable(java.util.logging.Level.FINE)) {
-            WorldsIntegration.listAvailableMethods();
-        }
-        
+
         getLogger().info("RandomItemPVP 插件已启用！");
         getLogger().info("特性：TNT投掷 | 火焰弹投掷 | 末影水晶 | 击杀奖励 | 连杀系统 | 空投系统 | 数据统计");
+
     }
 
     @Override
@@ -134,6 +117,11 @@ public final class RandomItemPVP extends JavaPlugin {
         // 清理所有盟友生物
         if (allyMobManager != null) {
             allyMobManager.clearAllAllies();
+        }
+        
+        // 清除物品能力冷却时间
+        if (itemAbilityManager != null) {
+            itemAbilityManager.clearCooldowns();
         }
         
         // 注销 PlaceholderAPI 扩展

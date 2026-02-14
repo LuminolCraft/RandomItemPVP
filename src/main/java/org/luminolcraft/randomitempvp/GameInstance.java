@@ -30,6 +30,10 @@ public class GameInstance {
     private volatile boolean eventTriggered = false;
     private final Random random = new Random();
     
+    // 准备状态管理
+    private final Set<Player> readyPlayers = ConcurrentHashMap.newKeySet(); // 已准备的玩家列表
+    private boolean fastCountdownActive = false; // 是否正在进行快速倒计时（5秒）
+    
     // 参与者管理
     private final Set<Player> participants = ConcurrentHashMap.newKeySet();
     private final Map<Player, Location> playerOriginalLocations = new HashMap<>();
@@ -50,6 +54,7 @@ public class GameInstance {
     private ScheduledTask eventTask = null;
     private ScheduledTask borderShrinkTask = null;
     private ScheduledTask aliveCountTask = null;
+    private ScheduledTask borderDamageTask = null;
     
     // 动态事件任务（如箭雨等，需要在停止时取消）
     private final List<ScheduledTask> dynamicEventTasks = Collections.synchronizedList(new ArrayList<>());
@@ -59,7 +64,7 @@ public class GameInstance {
     private int lastAliveCount = -1;
     
     // 地图重置管理器
-    private MapResetManager mapResetManager = null;
+    private MapResetter mapResetter = null;
     
     public GameInstance(GameArena arena, JavaPlugin plugin, ConfigManager config, PlayerStatsManager statsManager) {
         this.arena = arena;
@@ -92,20 +97,27 @@ public class GameInstance {
             playerOriginalInventories.put(player, originalItems);
         }
         
-        // 设置集合点为房间出生点
-        Location spawnLoc = arena.getSpawnLocation();
-        if (spawnLoc != null) {
-            gatherLocation = spawnLoc;
+        // 设置集合点为房间准备房间位置
+        Location lobbyLoc = arena.getLobbyLocation();
+        if (lobbyLoc != null) {
+            gatherLocation = lobbyLoc;
         } else {
-            // 如果出生点为 null，使用临时位置（不应该发生，但作为保护）
-            plugin.getLogger().warning("[房间 " + arena.getArenaName() + "] 出生点为 null！使用临时位置。");
-            gatherLocation = Bukkit.getWorlds().get(0).getSpawnLocation();
+            // 如果准备房间位置为 null，使用出生点作为备用
+            Location spawnLoc = arena.getSpawnLocation();
+            if (spawnLoc != null) {
+                gatherLocation = spawnLoc;
+            } else {
+                // 如果出生点也为 null，使用临时位置（不应该发生，但作为保护）
+                plugin.getLogger().warning("[房间 " + arena.getArenaName() + "] 准备房间位置和出生点都为 null！使用临时位置。");
+                gatherLocation = Bukkit.getWorlds().get(0).getSpawnLocation();
+            }
         }
         
-        // 传送到集合点
+        // 传送到准备房间
         if (gatherLocation != null) {
             player.teleportAsync(gatherLocation).thenRun(() -> {
-                player.sendMessage("§a已传送到房间集合点！");
+                player.sendMessage("§a已传送到房间准备区域！");
+                player.sendMessage("§7等待其他玩家加入...");
             });
         }
         
@@ -118,6 +130,17 @@ public class GameInstance {
     public boolean leaveGame(Player player) {
         if (gameRunning) return false; // 游戏运行中需要强制离开
         if (!participants.remove(player)) return false; // 不在列表中
+        
+        // 从已准备列表中移除
+        readyPlayers.remove(player);
+        
+        // 如果正在进行快速倒计时，取消它
+        if (fastCountdownActive && countdownTask != null) {
+            countdownTask.cancel();
+            countdownTask = null;
+            fastCountdownActive = false;
+            Bukkit.broadcastMessage("§e[房间 " + arena.getArenaName() + "] 玩家离开，快速倒计时已取消，等待所有玩家准备...");
+        }
         
         // 恢复原始物品（如果有保存）
         ItemStack[] originalItems = playerOriginalInventories.remove(player);
@@ -386,19 +409,53 @@ public class GameInstance {
         // 检查是否设置了出生点
         Location spawnLoc = arena.getSpawnLocation();
         if (spawnLoc == null) {
-            Bukkit.broadcastMessage("§c[房间 " + arena.getArenaName() + "] 错误：未设置游戏出生点！");
+            // 向房间内的玩家发送消息
+            for (Player p : initialParticipants) {
+                if (p.isOnline()) {
+                    p.sendMessage("§c[房间 " + arena.getArenaName() + "] 错误：未设置游戏出生点！");
+                    p.sendMessage("§c请先选择地图，然后再开始游戏");
+                }
+            }
+            return;
+        }
+        
+        // 检查是否有当前地图ID
+        String currentMapId = arena.getCurrentMapId();
+        if (currentMapId == null) {
+            // 向房间内的玩家发送消息
+            for (Player p : initialParticipants) {
+                if (p.isOnline()) {
+                    p.sendMessage("§c[房间 " + arena.getArenaName() + "] 错误：未选择地图！");
+                    p.sendMessage("§c请先选择地图，然后再开始游戏");
+                }
+            }
             return;
         }
         
         preparing = true;
-        gatherLocation = spawnLoc.clone();
+        
+        // 保持 gatherLocation 为准备房间位置，不要更改为游戏出生点
+        // 这样玩家可以在准备房间直接开始倒计时
+        if (gatherLocation == null) {
+            // 如果 gatherLocation 为 null，使用准备房间位置
+            Location lobbyLoc = arena.getLobbyLocation();
+            if (lobbyLoc != null) {
+                gatherLocation = lobbyLoc;
+            } else {
+                // 如果准备房间位置也为 null，使用游戏出生点
+                gatherLocation = spawnLoc.clone();
+            }
+        }
+        
+        // 重置准备状态
+        resetReadyStatus();
         
         // 首先将初始参与者添加到列表中
         for (Player player : initialParticipants) {
             participants.add(player); // add() 会自动处理重复
         }
         
-        // 记录并传送所有参与者（包括之前就在房间中的玩家）
+        // 记录所有参与者的原始位置（如果之前没有记录）
         for (Player player : new ArrayList<>(participants)) {
             // 只处理在线玩家
             if (!player.isOnline()) {
@@ -410,12 +467,6 @@ public class GameInstance {
             if (playerOriginalLocations.get(player) == null) {
                 playerOriginalLocations.put(player, player.getLocation().clone());
             }
-            
-            // 传送到集合点
-            player.teleportAsync(gatherLocation).thenRun(() -> {
-                player.sendMessage("§a已传送到集合点！");
-                player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0f, 1.0f);
-            });
         }
         
         // 广播消息
@@ -428,7 +479,6 @@ public class GameInstance {
         }
         
         // 使用当前地图的倒计时配置（如果有），否则使用全局配置
-        String currentMapId = arena.getCurrentMapId();
         int countdown = currentMapId != null ? config.getMapStartCountdown(currentMapId) : config.getStartCountdown();
         final int[] currentCount = {countdown}; // 使用数组以便在 lambda 中修改
         
@@ -453,10 +503,14 @@ public class GameInstance {
                 preparing = false;
                 
                 // 检查参与者数量（使用当前地图的配置）
-                // 注意：currentMapId 已在外部作用域声明（第424行）
                 int minPlayers = currentMapId != null ? config.getMapMinPlayers(currentMapId) : config.getMinPlayers();
                 if (participants.size() < minPlayers) {
-                    Bukkit.broadcastMessage("§c[房间 " + arena.getArenaName() + "] 参与者不足！游戏取消。需要至少 " + minPlayers + " 人");
+                    // 向房间内的玩家发送消息
+                    for (Player p : participants) {
+                        if (p.isOnline()) {
+                            p.sendMessage("§c[房间 " + arena.getArenaName() + "] 参与者不足！游戏取消。需要至少 " + minPlayers + " 人");
+                        }
+                    }
                     cancelGame();
                     return;
                 }
@@ -509,6 +563,8 @@ public class GameInstance {
             countdownTask = null;
         }
         preparing = false;
+        fastCountdownActive = false;
+        readyPlayers.clear();
         arena.setStatus(GameArena.ArenaStatus.WAITING);
         
         // 将所有参与者传送回原位置
@@ -524,6 +580,168 @@ public class GameInstance {
         participants.clear();
         gatherLocation = null;
         Bukkit.broadcastMessage("§c[房间 " + arena.getArenaName() + "] 游戏已取消！");
+    }
+    
+    /**
+     * 玩家准备
+     * @param player 玩家
+     * @return 是否准备成功
+     */
+    public boolean ready(Player player) {
+        if (!participants.contains(player) || gameRunning) {
+            return false;
+        }
+        
+        // 添加到已准备列表
+        readyPlayers.add(player);
+        player.sendMessage("§a你已准备就绪！");
+        
+        // 广播准备状态
+        int readyCount = readyPlayers.size();
+        int totalCount = participants.size();
+        String readyMessage = "§e[房间 " + arena.getArenaName() + "] 玩家 §6" + player.getName() + "§e 已准备就绪！";
+        readyMessage += " §7(" + readyCount + "/" + totalCount + ")";
+        Bukkit.broadcastMessage(readyMessage);
+        
+        // 检查是否所有玩家都已准备
+        if (readyCount >= totalCount && totalCount >= 1) {
+            // 所有玩家都已准备，开始快速倒计时
+            startFastCountdown();
+        }
+        
+        return true;
+    }
+    
+    /**
+     * 玩家取消准备
+     * @param player 玩家
+     * @return 是否取消成功
+     */
+    public boolean unready(Player player) {
+        if (!participants.contains(player) || gameRunning) {
+            return false;
+        }
+        
+        // 从已准备列表中移除
+        readyPlayers.remove(player);
+        player.sendMessage("§c你已取消准备！");
+        
+        // 广播准备状态
+        int readyCount = readyPlayers.size();
+        int totalCount = participants.size();
+        String unreadyMessage = "§e[房间 " + arena.getArenaName() + "] 玩家 §6" + player.getName() + "§e 已取消准备！";
+        unreadyMessage += " §7(" + readyCount + "/" + totalCount + ")";
+        Bukkit.broadcastMessage(unreadyMessage);
+        
+        // 如果正在进行快速倒计时，取消它
+        if (fastCountdownActive && countdownTask != null) {
+            countdownTask.cancel();
+            countdownTask = null;
+            fastCountdownActive = false;
+            Bukkit.broadcastMessage("§e[房间 " + arena.getArenaName() + "] 快速倒计时已取消，等待所有玩家准备...");
+        }
+        
+        return true;
+    }
+    
+    /**
+     * 开始快速倒计时（5秒）
+     */
+    private void startFastCountdown() {
+        if (gameRunning || !preparing) {
+            return;
+        }
+        
+        // 取消当前的倒计时任务
+        if (countdownTask != null) {
+            countdownTask.cancel();
+            countdownTask = null;
+        }
+        
+        fastCountdownActive = true;
+        final int[] currentCount = {5}; // 快速倒计时为5秒
+        
+        // 使用定时任务进行倒计时
+        countdownTask = Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
+            // 首先检查任务是否已被取消
+            if (countdownTask == null || !preparing || task.isCancelled()) {
+                task.cancel();
+                countdownTask = null;
+                fastCountdownActive = false;
+                return;
+            }
+            
+            int remaining = currentCount[0];
+            
+            if (remaining <= 0) {
+                // 倒计时结束，启动游戏
+                task.cancel();
+                countdownTask = null;
+                fastCountdownActive = false;
+                preparing = false;
+                
+                // 检查参与者数量
+                String currentMapId = arena.getCurrentMapId();
+                int minPlayers = currentMapId != null ? config.getMapMinPlayers(currentMapId) : config.getMinPlayers();
+                if (participants.size() < minPlayers) {
+                    Bukkit.broadcastMessage("§c[房间 " + arena.getArenaName() + "] 参与者不足！游戏取消。需要至少 " + minPlayers + " 人");
+                    cancelGame();
+                    return;
+                }
+                
+                // 开始游戏
+                startRound();
+                return;
+            }
+            
+            // 显示快速倒计时
+            List<Player> roomPlayers = new ArrayList<>(participants);
+            if (remaining <= 3) {
+                // 最后3秒：超大标题 + 强音效
+                for (Player p : roomPlayers) {
+                    if (p.isOnline()) {
+                        p.sendTitle("§6§l" + remaining, "§e游戏即将开始", 0, 20, 10);
+                        p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.5f);
+                    }
+                }
+                Bukkit.broadcastMessage("§e[房间 " + arena.getArenaName() + "] 游戏将在 §6" + remaining + " §e秒后开始... (快速倒计时)");
+            } else {
+                // 显示倒计时
+                for (Player p : roomPlayers) {
+                    if (p.isOnline()) {
+                        p.sendTitle("", "§7游戏将在 §e" + remaining + "§7 秒后开始 (快速倒计时)", 5, 20, 5);
+                    }
+                }
+                Bukkit.broadcastMessage("§e[房间 " + arena.getArenaName() + "] 游戏将在 §6" + remaining + " §e秒后开始... (快速倒计时)");
+            }
+            
+            currentCount[0]--;
+        }, 1, 20L); // 延迟1 tick，每20 ticks（1秒）执行一次
+    }
+    
+    /**
+     * 检查玩家是否已准备
+     * @param player 玩家
+     * @return 是否已准备
+     */
+    public boolean isPlayerReady(Player player) {
+        return readyPlayers.contains(player);
+    }
+    
+    /**
+     * 获取已准备玩家数量
+     * @return 已准备玩家数量
+     */
+    public int getReadyPlayerCount() {
+        return readyPlayers.size();
+    }
+    
+    /**
+     * 重置准备状态
+     */
+    private void resetReadyStatus() {
+        readyPlayers.clear();
+        fastCountdownActive = false;
     }
     
     public boolean isRunning() {
@@ -567,9 +785,14 @@ public class GameInstance {
         
         // 不再清理竞技场，直接删除世界实例即可
         
-        // 重置边界（如果有）
+        // 重置边界到配置文件设定的大小
         if (gameBorder != null) {
-            gameBorder.setSize(30000000, 0); // 重置为超大值
+            // 获取地图特定的初始边界半径
+            String currentMapId = arena.getCurrentMapId();
+            double initialRadius = currentMapId != null ? config.getMapRadius(currentMapId) : config.getArenaRadius();
+            // 边界直径 = 半径 * 2
+            double initialSize = initialRadius * 2;
+            gameBorder.setSize(initialSize, 0);
         }
         
         // 然后设置准备和运行标志为 false
@@ -703,12 +926,11 @@ public class GameInstance {
         }
         
         // 重置地图（即使房间被删除也要重置）
-        if (mapResetManager != null) {
+        if (mapResetter != null) {
             plugin.getLogger().info("[房间 " + arena.getArenaName() + "] 房间被删除，开始重置地图...");
             Bukkit.getGlobalRegionScheduler().runDelayed(plugin, task -> {
-                mapResetManager.resetMap();
-                mapResetManager.stopRecording();
-                mapResetManager = null;
+                mapResetter.resetMap();
+                mapResetter = null;
             }, 20L); // 1秒后开始重置，确保玩家已传送
         }
         
@@ -730,7 +952,7 @@ public class GameInstance {
     /**
      * 开始游戏回合
      */
-    private void startRound() {
+    public void startRound() {
         gameRunning = true;
         eventTriggered = false;
         
@@ -857,6 +1079,7 @@ public class GameInstance {
         startItemTask();
         startEventTask();
         startBorderShrink();
+        startBorderDamage();
         
         // 启动空投系统（多房间系统）
         AirdropManager airdropManager = RandomItemPVP.getInstance().getAirdropManager();
@@ -880,6 +1103,7 @@ public class GameInstance {
         if (eventTask != null) { eventTask.cancel(); eventTask = null; }
         if (borderShrinkTask != null) { borderShrinkTask.cancel(); borderShrinkTask = null; }
         if (aliveCountTask != null) { aliveCountTask.cancel(); aliveCountTask = null; }
+        if (borderDamageTask != null) { borderDamageTask.cancel(); borderDamageTask = null; }
         
         // 取消所有动态事件任务
         synchronized (dynamicEventTasks) {
@@ -929,6 +1153,13 @@ public class GameInstance {
     }
     
     /**
+     * 获取游戏边界
+     */
+    public WorldBorder getGameBorder() {
+        return gameBorder;
+    }
+    
+    /**
      * 生成竞技场（基岩柱子）
      */
     private void generateArena() {
@@ -938,9 +1169,9 @@ public class GameInstance {
         // 初始化地图重置管理器
         String currentMapId = arena.getCurrentMapId();
         int arenaRadius = currentMapId != null ? config.getMapRadius(currentMapId) : config.getArenaRadius();
-        mapResetManager = new MapResetManager(plugin, world, spawnLocation, arenaRadius);
-        mapResetManager.startRecording();
-        plugin.getLogger().info("[房间 " + arena.getArenaName() + "] 地图重置管理器已启动，开始记录所有变化");
+        mapResetter = new MapResetter(plugin, world, spawnLocation, arenaRadius, currentMapId);
+        mapResetter.saveInitialMapState();
+        plugin.getLogger().info("[房间 " + arena.getArenaName() + "] 使用地图重置系统，游戏结束后将自动恢复地图");
         
         // 获取参与者列表，围成一个圈
         List<Player> players = new ArrayList<>(participants);
@@ -952,8 +1183,8 @@ public class GameInstance {
         int circleRadius = Math.min(20, arenaRadius / 2); // 圆圈半径（玩家之间的距离）
         int pillarHeight = 128; // 基岩柱子高度
         
-        // 使用集合点的高度作为基准（所有人在同一位置，确保安全）
-        int baseGroundY = gatherLocation.getBlockY();
+        // 使用spawnLocation的y坐标作为基准，确保基岩柱从地图的原点开始生成
+        int baseGroundY = spawnLocation.getBlockY();
         
         for (int i = 0; i < playerCount; i++) {
             Player player = players.get(i);
@@ -984,10 +1215,6 @@ public class GameInstance {
                 for (int y = 0; y < pillarHeight; y++) {
                     Location bedrockLoc = new Location(world, pillarX, groundY + y, pillarZ);
                     Block block = bedrockLoc.getBlock();
-                    // 记录原始方块状态（如果之前不是基岩）
-                    if (mapResetManager != null && block.getType() != Material.BEDROCK) {
-                        mapResetManager.recordBedrockPlace(block);
-                    }
                     block.setType(Material.BEDROCK);
                 }
                 
@@ -996,10 +1223,6 @@ public class GameInstance {
                     for (int z = -1; z <= 1; z++) {
                         Location platformLoc = new Location(world, pillarX + x, groundY + pillarHeight, pillarZ + z);
                         Block platformBlock = platformLoc.getBlock();
-                        // 记录原始方块状态
-                        if (mapResetManager != null && platformBlock.getType() != Material.WHITE_STAINED_GLASS) {
-                            mapResetManager.recordBlockPlace(platformBlock, platformBlock.getState());
-                        }
                         platformBlock.setType(Material.WHITE_STAINED_GLASS);
                     }
                 }
@@ -1079,10 +1302,17 @@ public class GameInstance {
     private void startItemTask() {
         long intervalTicks = config.getItemInterval();
         itemTask = Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
+            // 多重检查，确保游戏正在运行
             if (!gameRunning) {
                 task.cancel();
                 return;
             }
+            
+            // 再次检查，确保任务没有被取消
+            if (itemTask == null || itemTask.isCancelled()) {
+                return;
+            }
+            
             List<Player> survivors = getSurvivingPlayers();
             if (survivors.isEmpty()) return;
 
@@ -1094,7 +1324,28 @@ public class GameInstance {
                 return;
             }
 
+            // 检查玩家是否仍然在游戏中
+            RandomItemPVP pluginInstance = RandomItemPVP.getInstance();
+            ArenaManager arenaManager = pluginInstance != null ? pluginInstance.getArenaManager() : null;
+            String arenaName = arena.getArenaName();
+
             for (Player player : survivors) {
+                // 检查玩家是否在线
+                if (!player.isOnline()) continue;
+                
+                // 检查玩家是否仍然在当前竞技场中
+                if (arenaManager != null) {
+                    String playerArena = arenaManager.getPlayerArena(player);
+                    if (playerArena == null || !playerArena.equals(arenaName)) {
+                        continue;
+                    }
+                }
+                
+                // 检查玩家是否在游戏世界中
+                if (spawnLocation != null && player.getWorld() != spawnLocation.getWorld()) {
+                    continue;
+                }
+                
                 // 使用权重系统选择物品
                 Material randomMat = selectWeightedRandomItem(droppableItems);
                 ItemStack item = createItemStack(randomMat);
@@ -1267,6 +1518,7 @@ public class GameInstance {
                 }
                 // 实体生成必须在区域调度器中执行（Folia 要求）
                 Location ghastLoc = ghastTarget.getLocation().add(random.nextInt(10) - 5, 5, random.nextInt(10) - 5);
+                // 移除边界检查，直接生成生物
                 Bukkit.getRegionScheduler().run(plugin, ghastLoc, task -> {
                     Entity ghast = ghastTarget.getWorld().spawnEntity(ghastLoc, EntityType.GHAST);
                 });
@@ -1283,6 +1535,7 @@ public class GameInstance {
                 // 实体生成必须在区域调度器中执行（Folia 要求）
                 for (int i = 0; i < 3; i++) {
                     Location zombieLoc = zombieTarget.getLocation().add(random.nextInt(10) - 5, 0, random.nextInt(10) - 5);
+                    // 移除边界检查，直接生成生物
                     Bukkit.getRegionScheduler().run(plugin, zombieLoc, task -> {
                         Entity zombie = zombieTarget.getWorld().spawnEntity(zombieLoc, EntityType.ZOMBIE);
                     });
@@ -1305,6 +1558,7 @@ public class GameInstance {
                     double offsetZ = random.nextDouble() * 10 - 5;
                     Location spawnLoc = creeperTarget.getLocation().add(offsetX, 30, offsetZ); // 30格高空
                     
+                    // 移除边界检查，直接生成生物
                     // 使用区域调度器生成苦力怕
                     Bukkit.getRegionScheduler().run(plugin, spawnLoc, task -> {
                         Creeper creeper = (Creeper) creeperTarget.getWorld().spawnEntity(spawnLoc, EntityType.CREEPER);
@@ -1444,6 +1698,57 @@ public class GameInstance {
             Bukkit.broadcastMessage("§e[房间 " + arena.getArenaName() + "] 边界正在缩小！当前直径：§6" + (int)newSize + "格");
             for (Player p : getSurvivingPlayers()) p.playSound(p.getLocation(), Sound.BLOCK_ANVIL_LAND, 1.0f, 1.0f);
         }, delay, interval);
+    }
+    
+    /**
+     * 启动边界伤害任务，对所有在边界外的生物造成伤害
+     */
+    private void startBorderDamage() {
+        borderDamageTask = Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, task -> {
+            if (!gameRunning || gameBorder == null || spawnLocation == null) {
+                task.cancel();
+                return;
+            }
+            
+            World world = spawnLocation.getWorld();
+            if (world == null) {
+                task.cancel();
+                return;
+            }
+            
+            // 获取边界中心和半径
+            Location borderCenter = spawnLocation; // 使用spawnLocation作为边界中心，避免原点传送问题
+            double borderRadius = gameBorder.getSize() / 2.0;
+            
+            // 检查所有生物
+            for (Entity entity : world.getEntities()) {
+                // 跳过玩家（玩家已经由Minecraft自带的边界伤害处理）
+                if (entity instanceof Player) {
+                    continue;
+                }
+                
+                // 只处理生物实体，跳过掉落物、TNT等非生物实体
+                if (!(entity instanceof org.bukkit.entity.LivingEntity)) {
+                    continue;
+                }
+                
+                // 检查生物是否在边界外
+                Location entityLoc = entity.getLocation();
+                double distance = entityLoc.distance(borderCenter);
+                
+                if (distance > borderRadius) {
+                    // 对边界外的生物造成伤害
+                    org.bukkit.entity.LivingEntity livingEntity = (org.bukkit.entity.LivingEntity) entity;
+                    double damage = config.getBorderDamageAmount();
+                    if (livingEntity.getHealth() > damage) {
+                        livingEntity.damage(damage);
+                    } else {
+                        // 直接杀死生命值不足的生物
+                        livingEntity.setHealth(0);
+                    }
+                }
+            }
+        }, 1, 20); // 每秒执行一次
     }
     
     /**
@@ -1670,59 +1975,7 @@ public class GameInstance {
         // 存活参与者可以正常使用桶
     }
     
-    /**
-     * 记录方块破坏（供 GameEventListener 调用）
-     */
-    public void recordBlockBreak(org.bukkit.block.Block block) {
-        if (mapResetManager != null && gameRunning) {
-            mapResetManager.recordBlockBreak(block);
-        }
-    }
-    
-    /**
-     * 记录方块放置（供 GameEventListener 调用）
-     */
-    public void recordBlockPlace(org.bukkit.block.Block block) {
-        if (mapResetManager != null && gameRunning) {
-            mapResetManager.recordBlockPlace(block);
-        }
-    }
-    
-    /**
-     * 记录方块放置（带被替换的方块状态，供 GameEventListener 调用）
-     */
-    public void recordBlockPlace(org.bukkit.block.Block block, org.bukkit.block.BlockState replacedState) {
-        if (mapResetManager != null && gameRunning) {
-            mapResetManager.recordBlockPlace(block, replacedState);
-        }
-    }
-    
-    /**
-     * 记录流体变化（供 GameEventListener 调用）
-     */
-    public void recordFluidChange(org.bukkit.block.Block block) {
-        if (mapResetManager != null && gameRunning) {
-            mapResetManager.recordFluidChange(block);
-        }
-    }
-    
-    /**
-     * 记录实体生成（供 GameEventListener 调用）
-     */
-    public void recordEntitySpawn(org.bukkit.entity.Entity entity) {
-        if (mapResetManager != null && gameRunning) {
-            mapResetManager.recordEntitySpawn(entity);
-        }
-    }
-    
-    /**
-     * 记录基岩生成（供 GameEventListener 调用）
-     */
-    public void recordBedrockPlace(org.bukkit.block.Block block) {
-        if (mapResetManager != null && gameRunning) {
-            mapResetManager.recordBedrockPlace(block);
-        }
-    }
+
     
     /**
      * 处理玩家离线
@@ -1830,9 +2083,14 @@ public class GameInstance {
         
         // 不再清理竞技场，直接删除世界实例即可
         
-        // 重置边界
+        // 重置边界到配置文件设定的大小
         if (gameBorder != null) {
-            gameBorder.setSize(30000000, 0);
+            // 获取地图特定的初始边界半径
+            String currentMapId = arena.getCurrentMapId();
+            double initialRadius = currentMapId != null ? config.getMapRadius(currentMapId) : config.getArenaRadius();
+            // 边界直径 = 半径 * 2
+            double initialSize = initialRadius * 2;
+            gameBorder.setSize(initialSize, 0);
         }
         
         // 先恢复玩家游戏模式和物品（在大厅传送前）
@@ -1981,19 +2239,32 @@ public class GameInstance {
         }
         
         // 重置地图（延迟执行，确保所有玩家都已传送）
-        if (mapResetManager != null) {
+        if (mapResetter != null) {
             Bukkit.getGlobalRegionScheduler().runDelayed(plugin, task -> {
                 plugin.getLogger().info("[房间 " + arena.getArenaName() + "] 开始重置地图...");
-                mapResetManager.resetMap();
-                mapResetManager.stopRecording();
-                mapResetManager = null;
+                mapResetter.resetMap();
+                mapResetter = null;
             }, 60L); // 3秒后开始重置
         }
         
-        // 清空游戏相关数据，但保留参与者列表（以便下一局使用）
-        // 注意：不清空 participants，让玩家留在房间中等待下一局
+        // 从 ArenaManager 的玩家房间映射中移除所有玩家
+        if (pluginInstance != null) {
+            ArenaManager arenaManager = pluginInstance.getArenaManager();
+            if (arenaManager != null) {
+                for (Player player : new ArrayList<>(participants)) {
+                    arenaManager.removePlayerFromArena(player);
+                }
+                for (Player spectator : new ArrayList<>(spectatorInventories.keySet())) {
+                    arenaManager.removePlayerFromArena(spectator);
+                }
+            }
+        }
+        
+        // 清空所有游戏相关数据，包括参与者列表
+        // 这样所有玩家会在游戏结束时退出房间
         playerOriginalLocations.clear();
         playerOriginalInventories.clear();
+        participants.clear();
         alivePlayers.clear();
         playerGameModes.clear();
         spectatorInventories.clear();
@@ -2005,6 +2276,14 @@ public class GameInstance {
         
         // 清理已离线玩家的参与者记录
         participants.removeIf(player -> !player.isOnline());
+        
+        // 释放地图锁定，确保下次游戏可以重新选择地图
+        if (pluginInstance != null) {
+            ArenaManager arenaManager = pluginInstance.getArenaManager();
+            if (arenaManager != null) {
+                arenaManager.cleanupArenaWorld(arena);
+            }
+        }
     }
 }
 

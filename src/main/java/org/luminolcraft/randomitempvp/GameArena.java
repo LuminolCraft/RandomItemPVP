@@ -10,6 +10,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class GameArena {
     private final String arenaName;
     private Location spawnLocation; // 改为可变的，支持投票后更新
+    private Location lobbyLocation; // 准备房间位置
     private World world; // 改为可变的，支持世界实例化
     private String instanceWorldKey; // 实例世界的 key（如果启用了世界实例化）
     private String currentMapId; // 当前选中的地图ID
@@ -28,8 +29,18 @@ public class GameArena {
     public GameArena(String arenaName, Location spawnLocation, JavaPlugin plugin, ConfigManager config, PlayerStatsManager statsManager) {
         this.arenaName = arenaName;
         this.spawnLocation = spawnLocation != null ? spawnLocation.clone() : null;
+        this.lobbyLocation = spawnLocation != null ? spawnLocation.clone() : null; // 默认使用出生点作为准备房间位置
         this.world = spawnLocation != null ? spawnLocation.getWorld() : null;
         this.gameInstance = new GameInstance(this, plugin, config, statsManager);
+    }
+    
+    public Location getLobbyLocation() {
+        if (lobbyLocation == null) return null;
+        return lobbyLocation.clone();
+    }
+    
+    public void setLobbyLocation(Location location) {
+        this.lobbyLocation = location != null ? location.clone() : null;
     }
     
     public String getArenaName() {
@@ -130,6 +141,10 @@ public class GameArena {
     }
     
     public boolean canJoin() {
+        // 同步状态（确保状态与实际游戏状态一致）
+        syncStatus();
+        
+        // 检查房间状态
         return status == ArenaStatus.WAITING || status == ArenaStatus.PREPARING;
     }
     

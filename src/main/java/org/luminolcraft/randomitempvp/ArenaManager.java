@@ -27,6 +27,9 @@ public class ArenaManager {
     // 自动启动延迟任务 <房间名, 任务>
     private final Map<String, ScheduledTask> autoStartTasks = new ConcurrentHashMap<>();
     
+    // 地图锁定机制 <地图ID, 房间名>
+    private final Map<String, String> lockedMaps = new ConcurrentHashMap<>();
+    
     public ArenaManager(JavaPlugin plugin, ConfigManager config, PlayerStatsManager statsManager) {
         this.plugin = plugin;
         this.config = config;
@@ -96,59 +99,23 @@ public class ArenaManager {
     }
     
     /**
-     * 创建房间（不绑定地图，启动投票）
+     * 创建房间（已禁用，只支持从配置文件加载固定房间）
      * @param arenaName 房间名
      * @param creator 创建者（可选，如果提供则自动加入房间）
      * @return 是否创建成功
      */
     public boolean createArena(String arenaName, Player creator) {
-        if (arenas.containsKey(arenaName)) {
-            return false; // 房间已存在
-        }
-        
-        // 检查是否有可用地图
-        List<String> availableMaps = config.getAvailableMaps();
-        if (availableMaps.isEmpty()) {
-            // 如果没有地图配置，使用旧的单点模式（使用配置中的 spawn）
-            Location defaultSpawn = config.loadSpawnLocation();
-            if (defaultSpawn == null) {
-                if (creator != null) {
-                    creator.sendMessage("§c错误：没有可用的地图配置，且未设置默认出生点！");
-                }
-                return false;
-            }
-            return createArena(arenaName, defaultSpawn, creator);
-        }
-        
-        // 使用临时出生点创建房间（将在投票后更新）
-        // 使用创建者的位置或世界出生点作为临时位置
-        Location tempSpawn;
-        if (creator != null && creator.isOnline()) {
-            tempSpawn = creator.getLocation();
+        if (creator != null) {
+            creator.sendMessage("§c错误：已禁用动态创建房间功能！");
+            creator.sendMessage("§c请在 config-modules/arenas.yml 中配置固定房间");
         } else {
-            tempSpawn = Bukkit.getWorlds().get(0).getSpawnLocation();
+            plugin.getLogger().warning("已禁用动态创建房间功能，请在 config-modules/arenas.yml 中配置固定房间");
         }
-        
-        GameArena arena = new GameArena(arenaName, tempSpawn, plugin, config, statsManager);
-        arenas.put(arenaName, arena);
-        
-        plugin.getLogger().info("房间 '" + arenaName + "' 已创建");
-        
-        // 广播创建房间的消息
-        String creatorName = creator != null && creator.isOnline() ? creator.getName() : "控制台";
-        Bukkit.broadcastMessage("§a[RandomItemPVP] 房间 '§6" + arenaName + "§a' 已创建！创建者：§e" + creatorName);
-        Bukkit.broadcastMessage("§7使用 /ripvp join " + arenaName + " 加入房间");
-        
-        // 如果提供了创建者，自动加入房间（加入后会检查是否开始投票）
-        if (creator != null && creator.isOnline()) {
-            joinArena(creator, arenaName);
-        }
-        
-        return true;
+        return false;
     }
     
     /**
-     * 创建房间（旧版兼容：直接指定出生点，不使用投票，支持配置预设）
+     * 创建房间（已禁用，只支持从配置文件加载固定房间）
      * @param arenaName 房间名
      * @param spawnLocation 出生点
      * @param creator 创建者（可选，如果提供则自动加入房间）
@@ -156,47 +123,17 @@ public class ArenaManager {
      * @return 是否创建成功
      */
     public boolean createArena(String arenaName, Location spawnLocation, Player creator, String presetName) {
-        if (arenas.containsKey(arenaName)) {
-            return false; // 房间已存在
+        if (creator != null) {
+            creator.sendMessage("§c错误：已禁用动态创建房间功能！");
+            creator.sendMessage("§c请在 config-modules/arenas.yml 中配置固定房间");
+        } else {
+            plugin.getLogger().warning("已禁用动态创建房间功能，请在 config-modules/arenas.yml 中配置固定房间");
         }
-        
-        // 注意：配置预设功能已移除，所有房间使用主配置
-        ConfigManager arenaConfig = config;
-        if (presetName != null && !presetName.isEmpty()) {
-            plugin.getLogger().warning("配置预设功能已移除，房间 '" + arenaName + "' 将使用主配置");
-            presetName = null; // 清除预设名称
-        }
-        
-        GameArena arena = new GameArena(arenaName, spawnLocation, plugin, arenaConfig, statsManager);
-        if (presetName != null) {
-            arena.setConfigPreset(presetName);
-        }
-        arenas.put(arenaName, arena);
-        
-        // 保存到配置文件
-        saveArenaConfig(arena);
-        
-        plugin.getLogger().info("房间 '" + arenaName + "' 已创建在 " + 
-            spawnLocation.getWorld().getName() + " (" + 
-            (int)spawnLocation.getX() + ", " + 
-            (int)spawnLocation.getY() + ", " + 
-            (int)spawnLocation.getZ() + ")" + (presetName != null ? " (配置预设: " + presetName + ")" : ""));
-        
-        // 广播创建房间的消息
-        String creatorName = creator != null && creator.isOnline() ? creator.getName() : "控制台";
-        Bukkit.broadcastMessage("§a[RandomItemPVP] 房间 '§6" + arenaName + "§a' 已创建！创建者：§e" + creatorName + (presetName != null ? " §7(预设: §e" + presetName + "§7)" : ""));
-        Bukkit.broadcastMessage("§7使用 /ripvp join " + arenaName + " 加入房间");
-        
-        // 如果提供了创建者，自动加入房间
-        if (creator != null && creator.isOnline()) {
-            joinArena(creator, arenaName);
-        }
-        
-        return true;
+        return false;
     }
     
     /**
-     * 创建房间（旧版兼容：直接指定出生点，不使用投票，使用主配置）
+     * 创建房间（已禁用，只支持从配置文件加载固定房间）
      * @param arenaName 房间名
      * @param spawnLocation 出生点
      * @param creator 创建者（可选，如果提供则自动加入房间）
@@ -207,7 +144,7 @@ public class ArenaManager {
     }
     
     /**
-     * 创建房间（无创建者自动加入）
+     * 创建房间（已禁用，只支持从配置文件加载固定房间）
      * @param arenaName 房间名
      * @param spawnLocation 出生点
      * @return 是否创建成功
@@ -257,25 +194,11 @@ public class ArenaManager {
         // 从房间列表中移除（最后一步，确保所有清理都完成了）
         arenas.remove(arenaName);
         
-        // 清理世界实例（如果使用了世界实例化）
-        if (config.isWorldInstancingEnabled() && WorldsIntegration.isWorldsAvailable()) {
-            String instanceWorldKey = arena.getInstanceWorldKey();
-            if (instanceWorldKey != null && config.isWorldInstancingAutoCleanup()) {
-                // 安全检查：确保是实例世界，不是模板世界
-                if (!isValidInstanceWorldKey(instanceWorldKey, arenaName)) {
-                    plugin.getLogger().severe("[房间 " + arenaName + "] 安全警告：实例世界 key 格式不正确，拒绝删除！Key: " + instanceWorldKey);
-                    return true; // 跳过删除，但继续删除房间
-                }
-                
-                // 删除世界实例
-                plugin.getLogger().info("[房间 " + arenaName + "] 正在删除世界实例: " + instanceWorldKey);
-                plugin.getLogger().info("[房间 " + arenaName + "] 安全验证：确认为实例世界（非模板世界）");
-                if (WorldsIntegration.deleteWorldInstance(instanceWorldKey)) {
-                    plugin.getLogger().info("[房间 " + arenaName + "] 世界实例已删除: " + instanceWorldKey);
-                } else {
-                    plugin.getLogger().warning("[房间 " + arenaName + "] 删除世界实例失败: " + instanceWorldKey);
-                }
-            }
+        // 释放地图锁定
+        String currentMapId = arena.getCurrentMapId();
+        if (currentMapId != null && lockedMaps.containsKey(currentMapId) && lockedMaps.get(currentMapId).equals(arenaName)) {
+            lockedMaps.remove(currentMapId);
+            plugin.getLogger().info("[房间 " + arenaName + "] 已释放地图锁定: " + currentMapId);
         }
         
         // 从配置文件删除
@@ -315,13 +238,20 @@ public class ArenaManager {
     
     /**
      * 清理房间的世界实例（游戏结束后调用）
-     * 专注于使用 Worlds 插件删除克隆的世界实例
+     * 专注于释放地图锁定
      * @param arena 房间
      */
     public void cleanupArenaWorld(GameArena arena) {
-        // 已禁用世界实例化，改用地图重置系统
-        // 地图重置由 GameInstance 的 MapResetManager 处理
-        plugin.getLogger().info("[房间 " + arena.getArenaName() + "] 地图重置由 MapResetManager 处理，无需手动清理世界");
+        // 地图重置由外部系统处理，无需手动清理世界
+        plugin.getLogger().info("[房间 " + arena.getArenaName() + "] 地图重置由外部系统处理，无需手动清理世界");
+
+        
+        // 释放当前地图的锁定
+        String currentMapId = arena.getCurrentMapId();
+        if (currentMapId != null && lockedMaps.containsKey(currentMapId) && lockedMaps.get(currentMapId).equals(arena.getArenaName())) {
+            lockedMaps.remove(currentMapId);
+            plugin.getLogger().info("[房间 " + arena.getArenaName() + "] 已释放地图锁定: " + currentMapId);
+        }
         
         // 获取投票管理器
         RandomItemPVP pluginInstance = (RandomItemPVP) plugin;
@@ -657,35 +587,69 @@ public class ArenaManager {
                 String currentMapId = arena.getCurrentMapId();
                 int voteDuration = currentMapId != null ? config.getMapVoteDuration(currentMapId) : config.getVoteDuration();
                 
-                // 等待投票结束后再启动倒计时
+                // 等待投票结束后直接开始游戏，不需要倒计时
                 Bukkit.getGlobalRegionScheduler().runDelayed(plugin, task -> {
                     // 投票结束后检查选中地图并更新出生点
-                    String selectedMapId = voteManager.getSelectedMap(arenaName);
-                    if (selectedMapId != null) {
-                        Location mapSpawn = config.loadMapSpawnLocation(selectedMapId);
-                        if (mapSpawn != null) {
-                        // 如果启用了世界实例化，创建独立的世界实例
-                        if (config.isWorldInstancingEnabled() && WorldsIntegration.isWorldsAvailable()) {
-                            setupWorldInstance(arena, selectedMapId, mapSpawn);
-                        } else {
-                            arena.setSpawnLocation(mapSpawn);
-                        }
-                        // 设置当前地图ID
-                        arena.setCurrentMapId(selectedMapId);
-                        String mapName = config.getMapName(selectedMapId);
-                        // 使用更明显的方式显示地图选择结果
-                        sendMapSelectedMessage(arenaName, mapName);
-                        } else {
-                            // 地图加载失败，使用默认出生点或随机选择
+                String selectedMapId = voteManager.getSelectedMap(arenaName);
+                if (selectedMapId != null) {
+                    Location mapSpawn = config.loadMapSpawnLocation(selectedMapId);
+                    if (mapSpawn != null) {
+                        // 检查地图是否已被其他房间锁定
+                        if (lockedMaps.containsKey(selectedMapId)) {
+                            String lockingArena = lockedMaps.get(selectedMapId);
+                            sendMessageToArena(arenaName, "§c[房间 " + arenaName + "] 地图 " + config.getMapName(selectedMapId) + " 已被房间 " + lockingArena + " 锁定，无法使用");
+                            // 随机选择其他地图
                             selectRandomMap(arena);
+                        } else {
+                            // 设置地图并锁定
+                            setupMap(arena, selectedMapId, mapSpawn);
+                            // 优先加载房间特定的准备房间位置
+                            Location arenaLobby = config.loadArenaLobbyLocation(arenaName);
+                            if (arenaLobby != null) {
+                                arena.setLobbyLocation(arenaLobby);
+                            } else {
+                                // 如果没有房间特定配置，加载地图的准备房间位置
+                                Location mapLobby = config.loadMapLobbyLocation(selectedMapId);
+                                if (mapLobby != null) {
+                                    arena.setLobbyLocation(mapLobby);
+                                }
+                            }
+                            String mapName = config.getMapName(selectedMapId);
+                            // 使用更明显的方式显示地图选择结果
+                            sendMapSelectedMessage(arenaName, mapName);
                         }
                     } else {
-                        // 投票未完成或没有选中地图，使用默认出生点或随机选择
+                        // 地图加载失败，使用默认出生点或随机选择
                         selectRandomMap(arena);
                     }
+                } else {
+                    // 投票未完成或没有选中地图，使用默认出生点或随机选择
+                    selectRandomMap(arena);
+                }
                     
-                    // 再次检查是否可以开始倒计时
-                    startCountdown(arena);
+                    // 直接开始游戏，不需要倒计时
+                    arena.setStatus(GameArena.ArenaStatus.PREPARING);
+                    
+                    GameInstance instance = arena.getGameInstance();
+                    Set<Player> participantsSet = instance.getParticipants();
+                    
+                    // 使用当前地图的最少玩家数（如果有），否则使用全局配置
+                    String arenaCurrentMapId = arena.getCurrentMapId();
+                    int minPlayers = arenaCurrentMapId != null ? config.getMapMinPlayers(arenaCurrentMapId) : config.getMinPlayers();
+                    if (participantsSet.size() >= minPlayers) {
+                        // 确保有出生点
+                        if (arena.getSpawnLocation() != null) {
+                            List<Player> participants = new ArrayList<>(participantsSet);
+                            // 直接开始游戏，不使用倒计时
+                            instance.startRound();
+                            
+                            // 广播消息
+                            sendMessageToArena(arena.getArenaName(), "§a房间 '§6" + arena.getArenaName() + "§a' 游戏开始！");
+                            sendMessageToArena(arena.getArenaName(), "§7地图：§e" + config.getMapName(arenaCurrentMapId != null ? arenaCurrentMapId : "未知"));
+                        } else {
+                            sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 错误：未设置游戏出生点！无法开始游戏。");
+                        }
+                    }
                 }, (voteDuration + 1) * 20L); // 等待投票时间结束 + 1秒
                 return;
             } else {
@@ -694,17 +658,30 @@ public class ArenaManager {
                 if (selectedMapId != null) {
                     Location mapSpawn = config.loadMapSpawnLocation(selectedMapId);
                     if (mapSpawn != null) {
-                        // 如果启用了世界实例化，创建独立的世界实例
-                        if (config.isWorldInstancingEnabled() && WorldsIntegration.isWorldsAvailable()) {
-                            setupWorldInstance(arena, selectedMapId, mapSpawn);
+                        // 检查地图是否已被其他房间锁定
+                        if (lockedMaps.containsKey(selectedMapId)) {
+                            String lockingArena = lockedMaps.get(selectedMapId);
+                            sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 地图 " + config.getMapName(selectedMapId) + " 已被房间 " + lockingArena + " 锁定，无法使用");
+                            // 随机选择其他地图
+                            selectRandomMap(arena);
                         } else {
-                            arena.setSpawnLocation(mapSpawn);
+                            // 设置地图并锁定
+                            setupMap(arena, selectedMapId, mapSpawn);
+                            // 优先加载房间特定的准备房间位置
+                            Location arenaLobby = config.loadArenaLobbyLocation(arena.getArenaName());
+                            if (arenaLobby != null) {
+                                arena.setLobbyLocation(arenaLobby);
+                            } else {
+                                // 如果没有房间特定配置，加载地图的准备房间位置
+                                Location mapLobby = config.loadMapLobbyLocation(selectedMapId);
+                                if (mapLobby != null) {
+                                    arena.setLobbyLocation(mapLobby);
+                                }
+                            }
+                            String mapName = config.getMapName(selectedMapId);
+                            // 使用更明显的方式显示地图选择结果
+                            sendMapSelectedMessage(arena.getArenaName(), mapName);
                         }
-                        // 设置当前地图ID
-                        arena.setCurrentMapId(selectedMapId);
-                        String mapName = config.getMapName(selectedMapId);
-                        // 使用更明显的方式显示地图选择结果
-                        sendMapSelectedMessage(arena.getArenaName(), mapName);
                     } else {
                         // 地图加载失败，使用随机选择
                         selectRandomMap(arena);
@@ -726,37 +703,61 @@ public class ArenaManager {
         int minPlayers = currentMapId != null ? config.getMapMinPlayers(currentMapId) : config.getMinPlayers();
         if (participantsSet.size() >= minPlayers) {
             // 确保有出生点
-            if (arena.getSpawnLocation() == null) {
+            if (arena.getSpawnLocation() != null) {
+                List<Player> participants = new ArrayList<>(participantsSet);
+                // 直接开始游戏，不使用倒计时
+                instance.startRound();
+                
+                // 广播消息
+                sendMessageToArena(arena.getArenaName(), "§a房间 '§6" + arena.getArenaName() + "§a' 游戏开始！");
+                sendMessageToArena(arena.getArenaName(), "§7地图：§e" + config.getMapName(currentMapId != null ? currentMapId : "未知"));
+            } else {
                 // 尝试加载默认出生点
                 Location defaultSpawn = config.loadSpawnLocation();
                 if (defaultSpawn != null) {
                     arena.setSpawnLocation(defaultSpawn);
+                    List<Player> participants = new ArrayList<>(participantsSet);
+                    // 直接开始游戏，不使用倒计时
+                    instance.startRound();
+                    
+                    // 广播消息
+                    sendMessageToArena(arena.getArenaName(), "§a房间 '§6" + arena.getArenaName() + "§a' 游戏开始！");
+                    sendMessageToArena(arena.getArenaName(), "§7使用默认出生点");
                 } else {
                     sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 错误：未设置游戏出生点！无法开始游戏。");
                     return;
                 }
             }
-            
-            List<Player> participants = new ArrayList<>(participantsSet);
-            instance.startGameWithCountdown(participants);
-            
-            // 广播消息
-            sendMessageToArena(arena.getArenaName(), "§a房间 '§6" + arena.getArenaName() + "§a' 开始倒计时！");
-            sendMessageToArena(arena.getArenaName(), "§7使用 /ripvp join " + arena.getArenaName() + " 加入");
         }
     }
     
     /**
-     * 设置世界实例（如果启用了世界实例化）
+     * 设置地图（移除世界实例化，添加地图锁定）
      * @param arena 房间
      * @param mapId 地图ID
      * @param templateSpawn 模板出生点
      */
-    private void setupWorldInstance(GameArena arena, String mapId, Location templateSpawn) {
-        // 已禁用世界实例化，改用地图重置系统
-        // 直接使用模板世界的出生点
+    private void setupMap(GameArena arena, String mapId, Location templateSpawn) {
+        // 检查地图是否已被其他房间锁定
+        if (lockedMaps.containsKey(mapId)) {
+            String lockingArena = lockedMaps.get(mapId);
+            plugin.getLogger().warning("[房间 " + arena.getArenaName() + "] 地图 " + mapId + " 已被房间 " + lockingArena + " 锁定，无法使用");
+            // 向房间内的玩家发送消息
+            sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 地图 " + config.getMapName(mapId) + " 已被房间 " + lockingArena + " 锁定，无法使用");
+            return;
+        }
+        
+        // 锁定地图
+        lockedMaps.put(mapId, arena.getArenaName());
+        plugin.getLogger().info("[房间 " + arena.getArenaName() + "] 已锁定地图: " + mapId);
+        
+        // 直接使用模板世界（移除世界实例化）
         arena.setSpawnLocation(templateSpawn);
         arena.setWorld(templateSpawn.getWorld());
+        arena.setInstanceWorldKey(null);
+        arena.setCurrentMapId(mapId);
+        
+        plugin.getLogger().info("[房间 " + arena.getArenaName() + "] 使用地图: " + mapId);
         plugin.getLogger().info("[房间 " + arena.getArenaName() + "] 使用地图重置系统，游戏结束后将自动恢复地图");
     }
     
@@ -777,23 +778,37 @@ public class ArenaManager {
             return false; // 游戏进行中不能重新选择
         }
         
+        // 释放当前地图的锁定
+        String currentMapId = arena.getCurrentMapId();
+        if (currentMapId != null && lockedMaps.containsKey(currentMapId) && lockedMaps.get(currentMapId).equals(arenaName)) {
+            lockedMaps.remove(currentMapId);
+            plugin.getLogger().info("[房间 " + arenaName + "] 已释放地图锁定: " + currentMapId);
+        }
+        
         // 如果提供了地图ID，使用该地图；否则随机选择
         if (mapId != null && config.mapExists(mapId)) {
             Location mapSpawn = config.loadMapSpawnLocation(mapId);
             if (mapSpawn != null) {
-                // 如果启用了世界实例化，清理旧的世界实例并创建新的
-                if (config.isWorldInstancingEnabled() && WorldsIntegration.isWorldsAvailable()) {
-                    String oldInstanceKey = arena.getInstanceWorldKey();
-                    if (oldInstanceKey != null && isValidInstanceWorldKey(oldInstanceKey, arenaName)) {
-                        // 清理旧的世界实例
-                        WorldsIntegration.deleteWorldInstance(oldInstanceKey);
-                        arena.setInstanceWorldKey(null);
-                    }
-                    setupWorldInstance(arena, mapId, mapSpawn);
-                } else {
-                    arena.setSpawnLocation(mapSpawn);
+                // 检查地图是否已被其他房间锁定
+                if (lockedMaps.containsKey(mapId)) {
+                    String lockingArena = lockedMaps.get(mapId);
+                    sendMessageToArena(arenaName, "§c[房间 " + arenaName + "] 地图 " + config.getMapName(mapId) + " 已被房间 " + lockingArena + " 锁定，无法使用");
+                    return false;
                 }
-                arena.setCurrentMapId(mapId);
+                
+                // 设置地图并锁定
+                setupMap(arena, mapId, mapSpawn);
+                // 优先加载房间特定的准备房间位置
+                Location arenaLobby = config.loadArenaLobbyLocation(arenaName);
+                if (arenaLobby != null) {
+                    arena.setLobbyLocation(arenaLobby);
+                } else {
+                    // 如果没有房间特定配置，加载地图的准备房间位置
+                    Location mapLobby = config.loadMapLobbyLocation(mapId);
+                    if (mapLobby != null) {
+                        arena.setLobbyLocation(mapLobby);
+                    }
+                }
                 String mapName = config.getMapName(mapId);
                 sendMessageToArena(arenaName, "§a[房间 " + arenaName + "] 已重新选择地图：§e" + mapName);
                 return true;
@@ -814,18 +829,42 @@ public class ArenaManager {
     private void selectRandomMap(GameArena arena) {
         List<String> availableMaps = config.getAvailableMaps();
         if (!availableMaps.isEmpty()) {
-            // 随机选择地图
-            String randomMapId = availableMaps.get(new java.util.Random().nextInt(availableMaps.size()));
+            // 过滤掉已被锁定的地图
+            List<String> unlockedMaps = new ArrayList<>();
+            for (String mapId : availableMaps) {
+                if (!lockedMaps.containsKey(mapId)) {
+                    unlockedMaps.add(mapId);
+                }
+            }
+            
+            // 如果所有地图都被锁定，使用默认出生点
+            if (unlockedMaps.isEmpty()) {
+                sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 所有地图都已被其他房间锁定，使用默认出生点");
+                Location defaultSpawn = config.loadSpawnLocation();
+                if (defaultSpawn != null) {
+                    arena.setSpawnLocation(defaultSpawn);
+                    arena.setCurrentMapId(null); // 未选择地图
+                }
+                return;
+            }
+            
+            // 从解锁的地图中随机选择
+            String randomMapId = unlockedMaps.get(new java.util.Random().nextInt(unlockedMaps.size()));
             Location mapSpawn = config.loadMapSpawnLocation(randomMapId);
             if (mapSpawn != null) {
-                // 如果启用了世界实例化，创建独立的世界实例
-                if (config.isWorldInstancingEnabled() && WorldsIntegration.isWorldsAvailable()) {
-                    setupWorldInstance(arena, randomMapId, mapSpawn);
+                // 设置地图并锁定
+                setupMap(arena, randomMapId, mapSpawn);
+                // 优先加载房间特定的准备房间位置
+                Location arenaLobby = config.loadArenaLobbyLocation(arena.getArenaName());
+                if (arenaLobby != null) {
+                    arena.setLobbyLocation(arenaLobby);
                 } else {
-                    arena.setSpawnLocation(mapSpawn);
+                    // 如果没有房间特定配置，加载地图的准备房间位置
+                    Location mapLobby = config.loadMapLobbyLocation(randomMapId);
+                    if (mapLobby != null) {
+                        arena.setLobbyLocation(mapLobby);
+                    }
                 }
-                // 设置当前地图ID
-                arena.setCurrentMapId(randomMapId);
                 String mapName = config.getMapName(randomMapId);
                 // 使用更明显的方式显示地图选择结果
                 sendMapSelectedMessage(arena.getArenaName(), mapName);
@@ -867,7 +906,54 @@ public class ArenaManager {
      * 从配置文件加载所有房间
      */
     public void loadArenas() {
-        // TODO: 从配置文件加载房间
+        // 清空现有房间列表
+        arenas.clear();
+        
+        // 加载固定房间配置
+        List<String> fixedArenas = config.getFixedArenas();
+        for (String arenaName : fixedArenas) {
+            String defaultMap = config.getFixedArenaDefaultMap(arenaName);
+            
+            if (defaultMap != null && config.mapExists(defaultMap)) {
+                Location mapSpawn = config.loadMapSpawnLocation(defaultMap);
+                if (mapSpawn != null) {
+                    // 创建固定房间（有默认地图）
+                    GameArena arena = new GameArena(arenaName, mapSpawn, plugin, config, statsManager);
+                    arena.setCurrentMapId(defaultMap);
+                    
+                    // 优先加载房间特定的准备房间位置
+                    Location arenaLobby = config.loadArenaLobbyLocation(arenaName);
+                    if (arenaLobby != null) {
+                        arena.setLobbyLocation(arenaLobby);
+                    } else {
+                        // 如果没有房间特定配置，加载地图的准备房间位置
+                        Location mapLobby = config.loadMapLobbyLocation(defaultMap);
+                        if (mapLobby != null) {
+                            arena.setLobbyLocation(mapLobby);
+                        }
+                    }
+                    
+                    arenas.put(arenaName, arena);
+                    plugin.getLogger().info("已从配置文件加载固定房间: " + arenaName + " (默认地图: " + defaultMap + ")");
+                } else {
+                    plugin.getLogger().warning("无法加载固定房间 " + arenaName + " 的地图出生点");
+                }
+            } else {
+                // 没有默认地图或地图无效，创建没有默认地图的房间
+                // 不使用默认出生点作为临时位置，而是使用 null
+                GameArena arena = new GameArena(arenaName, null, plugin, config, statsManager);
+                arena.setCurrentMapId(null); // 未设置默认地图，使用投票系统
+                
+                // 加载房间特定的准备房间位置
+                Location arenaLobby = config.loadArenaLobbyLocation(arenaName);
+                if (arenaLobby != null) {
+                    arena.setLobbyLocation(arenaLobby);
+                }
+                
+                arenas.put(arenaName, arena);
+                plugin.getLogger().info("已从配置文件加载固定房间: " + arenaName + " (使用投票系统选择地图)");
+            }
+        }
     }
     
     /**

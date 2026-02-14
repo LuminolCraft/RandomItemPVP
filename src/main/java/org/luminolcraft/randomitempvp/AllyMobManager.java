@@ -4,6 +4,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.WorldBorder;
 import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -162,14 +163,19 @@ public class AllyMobManager implements Listener {
         }
         
         try {
-            EntityType entityType = EntityType.valueOf(entityTypeName);
+            final EntityType entityType = EntityType.valueOf(entityTypeName);
+            final JavaPlugin finalPlugin = plugin;
             
             // 延迟生成，确保位置正确（使用 Folia 兼容的调度器）
-            Player player = event.getPlayer();
+            final Player player = event.getPlayer();
             Location spawnLoc = player.getLocation();
             
-            Bukkit.getRegionScheduler().run(plugin, spawnLoc, task -> {
-                Entity spawned = spawnLoc.getWorld().spawnEntity(spawnLoc, entityType);
+            // 移除边界检查，直接使用玩家位置生成生物
+            final Location finalSpawnLoc = spawnLoc;
+            final ItemStack finalItem = item;
+            
+            Bukkit.getRegionScheduler().run(finalPlugin, finalSpawnLoc, task -> {
+                Entity spawned = finalSpawnLoc.getWorld().spawnEntity(finalSpawnLoc, entityType);
                 
                 // 设置所有者
                 setAllyOwner(spawned, player);
@@ -180,8 +186,8 @@ public class AllyMobManager implements Listener {
                 player.sendMessage("§a已召唤盟友：" + getEntityTypeName(entityType));
                 
                 // 减少刷怪蛋数量
-                if (item.getAmount() > 1) {
-                    item.setAmount(item.getAmount() - 1);
+                if (finalItem.getAmount() > 1) {
+                    finalItem.setAmount(finalItem.getAmount() - 1);
                 } else {
                     player.getInventory().setItemInMainHand(null);
                 }
