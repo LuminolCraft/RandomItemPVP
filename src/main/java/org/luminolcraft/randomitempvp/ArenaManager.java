@@ -712,22 +712,34 @@ public class ArenaManager {
                 sendMessageToArena(arena.getArenaName(), "§a房间 '§6" + arena.getArenaName() + "§a' 游戏开始！");
                 sendMessageToArena(arena.getArenaName(), "§7地图：§e" + config.getMapName(currentMapId != null ? currentMapId : "未知"));
             } else {
-                // 尝试加载默认出生点
-                Location defaultSpawn = config.loadSpawnLocation();
-                if (defaultSpawn != null) {
-                    arena.setSpawnLocation(defaultSpawn);
-                    List<Player> participants = new ArrayList<>(participantsSet);
-                    // 直接开始游戏，不使用倒计时
-                    instance.startRound();
-                    
-                    // 广播消息
-                    sendMessageToArena(arena.getArenaName(), "§a房间 '§6" + arena.getArenaName() + "§a' 游戏开始！");
-                    sendMessageToArena(arena.getArenaName(), "§7使用默认出生点");
-                } else {
-                    sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 错误：未设置游戏出生点！无法开始游戏。");
-                    return;
-                }
-            }
+                            // 尝试使用配置的默认地图
+                            String defaultMapId = config.getDefaultMapId();
+                            if (defaultMapId == null || !config.mapExists(defaultMapId)) {
+                                // 如果默认地图未配置或不存在，使用第一个可用地图
+                                List<String> availableMaps = config.getAvailableMaps();
+                                if (!availableMaps.isEmpty()) {
+                                    defaultMapId = availableMaps.get(0);
+                                } else {
+                                    sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 错误：没有可用地图！无法开始游戏。");
+                                    return;
+                                }
+                            }
+                            Location mapSpawn = config.loadMapSpawnLocation(defaultMapId);
+                            if (mapSpawn != null) {
+                                // 设置地图并锁定
+                                setupMap(arena, defaultMapId, mapSpawn);
+                                List<Player> participants = new ArrayList<>(participantsSet);
+                                // 直接开始游戏，不使用倒计时
+                                instance.startRound();
+                                
+                                // 广播消息
+                                sendMessageToArena(arena.getArenaName(), "§a房间 '§6" + arena.getArenaName() + "§a' 游戏开始！");
+                                sendMessageToArena(arena.getArenaName(), "§7地图：§e" + config.getMapName(defaultMapId));
+                            } else {
+                                sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 错误：无法加载默认地图！无法开始游戏。");
+                                return;
+                            }
+                        }
         }
     }
     
@@ -837,13 +849,37 @@ public class ArenaManager {
                 }
             }
             
-            // 如果所有地图都被锁定，使用默认出生点
+            // 如果所有地图都被锁定，使用配置的默认地图
             if (unlockedMaps.isEmpty()) {
-                sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 所有地图都已被其他房间锁定，使用默认出生点");
-                Location defaultSpawn = config.loadSpawnLocation();
-                if (defaultSpawn != null) {
-                    arena.setSpawnLocation(defaultSpawn);
-                    arena.setCurrentMapId(null); // 未选择地图
+                sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 所有地图都已被其他房间锁定，使用默认地图");
+                // 使用配置的默认地图（如果有）
+                String defaultMapId = config.getDefaultMapId();
+                if (defaultMapId == null || !config.mapExists(defaultMapId)) {
+                    // 如果默认地图未配置或不存在，使用第一个可用地图
+                    if (!availableMaps.isEmpty()) {
+                        defaultMapId = availableMaps.get(0);
+                    } else {
+                        return;
+                    }
+                }
+                Location defaultMapSpawn = config.loadMapSpawnLocation(defaultMapId);
+                if (defaultMapSpawn != null) {
+                    // 设置地图并锁定
+                    setupMap(arena, defaultMapId, defaultMapSpawn);
+                    // 优先加载房间特定的准备房间位置
+                    Location arenaLobby = config.loadArenaLobbyLocation(arena.getArenaName());
+                    if (arenaLobby != null) {
+                        arena.setLobbyLocation(arenaLobby);
+                    } else {
+                        // 如果没有房间特定配置，加载地图的准备房间位置
+                        Location mapLobby = config.loadMapLobbyLocation(defaultMapId);
+                        if (mapLobby != null) {
+                            arena.setLobbyLocation(mapLobby);
+                        }
+                    }
+                    String mapName = config.getMapName(defaultMapId);
+                    // 使用更明显的方式显示地图选择结果
+                    sendMapSelectedMessage(arena.getArenaName(), mapName);
                 }
                 return;
             }
@@ -869,20 +905,63 @@ public class ArenaManager {
                 // 使用更明显的方式显示地图选择结果
                 sendMapSelectedMessage(arena.getArenaName(), mapName);
             } else {
-                // 随机地图加载失败，使用默认出生点
-                Location defaultSpawn = config.loadSpawnLocation();
-                if (defaultSpawn != null) {
-                    arena.setSpawnLocation(defaultSpawn);
-                    arena.setCurrentMapId(null); // 未选择地图
-                    sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 地图加载失败，使用默认出生点");
+                // 随机地图加载失败，使用配置的默认地图
+                sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 地图加载失败，使用默认地图");
+                // 使用配置的默认地图（如果有）
+                String defaultMapId = config.getDefaultMapId();
+                if (defaultMapId == null || !config.mapExists(defaultMapId)) {
+                    // 如果默认地图未配置或不存在，使用第一个可用地图
+                    if (!availableMaps.isEmpty()) {
+                        defaultMapId = availableMaps.get(0);
+                    } else {
+                        return;
+                    }
+                }
+                Location defaultMapSpawn = config.loadMapSpawnLocation(defaultMapId);
+                if (defaultMapSpawn != null) {
+                    // 设置地图并锁定
+                    setupMap(arena, defaultMapId, defaultMapSpawn);
+                    // 优先加载房间特定的准备房间位置
+                    Location arenaLobby = config.loadArenaLobbyLocation(arena.getArenaName());
+                    if (arenaLobby != null) {
+                        arena.setLobbyLocation(arenaLobby);
+                    } else {
+                        // 如果没有房间特定配置，加载地图的准备房间位置
+                        Location mapLobby = config.loadMapLobbyLocation(defaultMapId);
+                        if (mapLobby != null) {
+                            arena.setLobbyLocation(mapLobby);
+                        }
+                    }
+                    String mapName = config.getMapName(defaultMapId);
+                    // 使用更明显的方式显示地图选择结果
+                    sendMapSelectedMessage(arena.getArenaName(), mapName);
                 }
             }
         } else {
-            // 没有可用地图，使用默认出生点
-            Location defaultSpawn = config.loadSpawnLocation();
-            if (defaultSpawn != null) {
-                arena.setSpawnLocation(defaultSpawn);
-                arena.setCurrentMapId(null); // 未选择地图
+            // 没有可用地图，使用配置的默认地图
+            sendMessageToArena(arena.getArenaName(), "§c[房间 " + arena.getArenaName() + "] 没有可用地图，使用默认地图");
+            // 使用配置的默认地图（如果有）
+            String defaultMapId = config.getDefaultMapId();
+            if (defaultMapId != null && config.mapExists(defaultMapId)) {
+                Location defaultMapSpawn = config.loadMapSpawnLocation(defaultMapId);
+                if (defaultMapSpawn != null) {
+                    // 设置地图并锁定
+                    setupMap(arena, defaultMapId, defaultMapSpawn);
+                    // 优先加载房间特定的准备房间位置
+                    Location arenaLobby = config.loadArenaLobbyLocation(arena.getArenaName());
+                    if (arenaLobby != null) {
+                        arena.setLobbyLocation(arenaLobby);
+                    } else {
+                        // 如果没有房间特定配置，加载地图的准备房间位置
+                        Location mapLobby = config.loadMapLobbyLocation(defaultMapId);
+                        if (mapLobby != null) {
+                            arena.setLobbyLocation(mapLobby);
+                        }
+                    }
+                    String mapName = config.getMapName(defaultMapId);
+                    // 使用更明显的方式显示地图选择结果
+                    sendMapSelectedMessage(arena.getArenaName(), mapName);
+                }
             }
         }
     }

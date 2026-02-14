@@ -241,73 +241,7 @@ public class ConfigManager {
         return getItemWeights().getOrDefault(material, 1);
     }
 
-    public void saveSpawnLocation(Location location) {
-        if (location == null) return;
 
-        config.set("arena.spawn.world", location.getWorld().getName());
-        config.set("arena.spawn.x", location.getX());
-        config.set("arena.spawn.y", location.getY());
-        config.set("arena.spawn.z", location.getZ());
-        config.set("arena.spawn.yaw", location.getYaw());
-        config.set("arena.spawn.pitch", location.getPitch());
-        plugin.saveConfig();
-
-        if (arenaModule != null) {
-            if (!arenaModule.isConfigurationSection("spawn")) {
-                arenaModule.createSection("spawn");
-            }
-            ConfigurationSection spawnSection = arenaModule.getConfigurationSection("spawn");
-            if (spawnSection != null) {
-                spawnSection.set("world", location.getWorld().getName());
-                spawnSection.set("x", location.getX());
-                spawnSection.set("y", location.getY());
-                spawnSection.set("z", location.getZ());
-                spawnSection.set("yaw", location.getYaw());
-                spawnSection.set("pitch", location.getPitch());
-                saveModule(arenaModule, arenaModuleFile, "arena.yml");
-            }
-        }
-
-        plugin.getLogger().info("游戏出生点已保存：" +
-            String.format("世界=%s, 坐标=(%.1f, %.1f, %.1f)",
-                location.getWorld().getName(),
-                location.getX(),
-                location.getY(),
-                location.getZ()));
-    }
-
-    public Location loadSpawnLocation() {
-        return loadSpawnLocation(false);
-    }
-
-    public Location loadSpawnLocation(boolean showLog) {
-        ConfigurationSection spawnSection = readSection(arenaModule, "spawn", "arena.spawn");
-        if (spawnSection == null || !spawnSection.contains("world")) {
-            return null;
-        }
-
-        String worldName = spawnSection.getString("world");
-        World world = Bukkit.getWorld(worldName);
-
-        if (world == null) {
-            plugin.getLogger().warning("配置文件中的世界 '" + worldName + "' 不存在！");
-            return null;
-        }
-
-        double x = spawnSection.getDouble("x", 0.0);
-        double y = spawnSection.getDouble("y", 64.0);
-        double z = spawnSection.getDouble("z", 0.0);
-        float yaw = (float) spawnSection.getDouble("yaw", 0.0);
-        float pitch = (float) spawnSection.getDouble("pitch", 0.0);
-
-        if (showLog) {
-            plugin.getLogger().info("从配置文件加载游戏出生点：" +
-                String.format("世界=%s, 坐标=(%.1f, %.1f, %.1f)",
-                    worldName, x, y, z));
-        }
-
-        return new Location(world, x, y, z, yaw, pitch);
-    }
 
     public List<String> getAvailableMaps() {
         List<String> maps = new ArrayList<>();
@@ -328,6 +262,20 @@ public class ConfigManager {
             maps.addAll(mapsSection.getKeys(false));
         }
         return maps;
+    }
+
+    /**
+     * 获取默认地图ID
+     * @return 默认地图ID，如果未配置则返回null
+     */
+    public String getDefaultMapId() {
+        if (mapsModule != null) {
+            String defaultMap = mapsModule.getString("default-map");
+            if (defaultMap != null && !defaultMap.isEmpty()) {
+                return defaultMap;
+            }
+        }
+        return config.getString("arena.default-map");
     }
 
     private ConfigurationSection getMapSection(String mapId) {

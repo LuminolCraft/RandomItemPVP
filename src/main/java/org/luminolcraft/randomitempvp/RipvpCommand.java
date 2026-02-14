@@ -569,37 +569,7 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 
-                case "setspawn": {
-                    if (player == null) return true;
-                    if (!player.hasPermission("ripvp.admin")) {
-                        player.sendMessage(ChatColor.RED + "你没有权限使用此命令！");
-                        return true;
-                    }
-                    // 如果提供了房间名，设置房间出生点
-                    if (args.length >= 2) {
-                        String spawnArenaName = args[1];
-                        GameArena spawnArena = arenaManager.getArena(spawnArenaName);
-                        if (spawnArena == null) {
-                            player.sendMessage(ChatColor.RED + "房间 '" + spawnArenaName + "' 不存在！");
-                            return true;
-                        }
-                        // TODO: 实现设置房间出生点的功能
-                        player.sendMessage(ChatColor.YELLOW + "房间出生点功能待实现");
-                        return true;
-                    }
-                    // 否则设置全局出生点（保存到配置文件）
-                    configManager.saveSpawnLocation(player.getLocation());
-                    player.sendMessage(ChatColor.GREEN + "✓ 全局游戏出生点已设置为当前位置！");
-                    player.sendMessage(ChatColor.GREEN + "✓ 已保存到配置文件，重启后不会丢失！");
-                    player.sendMessage(ChatColor.YELLOW + "位置：" + 
-                        String.format("世界=%s, X=%.1f, Y=%.1f, Z=%.1f", 
-                        player.getWorld().getName(),
-                        player.getLocation().getX(),
-                        player.getLocation().getY(),
-                        player.getLocation().getZ()));
-                    player.sendMessage(ChatColor.GRAY + "提示：新创建的房间将使用此出生点");
-                    return true;
-                }
+
                 
                 case "savemap": {
                     if (player == null) return true;
@@ -767,7 +737,7 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command, @NotNull String alias, @NotNull String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("start", "stop", "join", "leave", "cancel", "delete", "list", "setspawn", "status", "reload", "stats", "top", "vote", "remap", "ready", "unready");
+            return Arrays.asList("start", "stop", "join", "leave", "cancel", "delete", "list", "status", "reload", "stats", "top", "vote", "remap", "ready", "unready");
         } else if (args.length == 2) {
             switch (args[0].toLowerCase()) {
                 case "start":
@@ -776,7 +746,6 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                     return arenaNames.isEmpty() ? null : arenaNames;
                 case "join":
                 case "delete":
-                case "setspawn":
                     // 返回房间名列表
                     return new ArrayList<>(arenaManager.getArenaNames());
                 case "vote":
@@ -854,7 +823,6 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
             sender.sendMessage(ChatColor.RED + "管理员命令：");
             sender.sendMessage(ChatColor.WHITE + "  /ripvp delete <房间名> - 删除房间（控制台可用）");
             sender.sendMessage(ChatColor.WHITE + "  /ripvp remap [地图名] - 重新选择地图（准备阶段）");
-            sender.sendMessage(ChatColor.WHITE + "  /ripvp setspawn [房间名] - 设置游戏出生点");
             sender.sendMessage(ChatColor.WHITE + "  /ripvp stop - 强制停止当前游戏");
             sender.sendMessage(ChatColor.WHITE + "  /ripvp cancel - 取消准备中的游戏");
             sender.sendMessage(ChatColor.WHITE + "  /ripvp reload - 热加载配置文件（控制台可用）");
