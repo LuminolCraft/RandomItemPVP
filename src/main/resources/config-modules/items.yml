@@ -122,6 +122,16 @@ weights:
   IRON_AXE: 15                 # 铁斧
   STONE_AXE: 12                # 石斧
   
+  # 茅
+  IRON_SPEAR: 18               # 铁茅
+  STONE_SPEAR: 14              # 石茅
+  copper_spear: 12             #铜矛
+  WOODEN_SPEAR: 12             # 木茅
+  GOLDEN_SPEAR: 10             # 金茅
+  DIAMOND_SPEAR: 16             # 钻石茅
+  NETHERITE_SPEAR: 8            # 下界合金茅
+  mace: 14                      #重锤
+  
   # 远程武器（权重 15-20）
   BOW: 20                       # 弓
   CROSSBOW: 15                  # 弩
@@ -192,6 +202,7 @@ weights:
   # 移动物品（权重 15-25）
   ENDER_PEARL: 25              # 末影珍珠
   SNOWBALL: 22                 # 雪球
+  wind_charge: 22              # 风弹
   EGG: 20                      # 鸡蛋
   FISHING_ROD: 18              # 鱼竿
   
@@ -201,6 +212,8 @@ weights:
   COMPASS: 18                  # 指南针
   CLOCK: 15                    # 时钟
   MAP: 15                      # 地图
+  WATER_BUCKET: 20              # 水桶
+  LAVA_BUCKET: 18              # 岩浆桶
   
   # 爆炸物（权重 12-20）
   FIRE_CHARGE: 18              # 火焰弹

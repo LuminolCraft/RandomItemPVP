@@ -46,8 +46,7 @@ public class MapVoteManager {
      */
     private void sendMessageToArena(String arenaName, String message) {
         if (arenaManager == null) {
-            // 如果没有 ArenaManager，回退到广播
-            Bukkit.broadcastMessage(message);
+            // 如果没有 ArenaManager，无法获取房间内的玩家列表，直接返回
             return;
         }
         
@@ -127,6 +126,23 @@ public class MapVoteManager {
                 scheduledTask.cancel();
                 voteTasks.remove(arenaName);
                 return;
+            }
+            
+            // 检查玩家数量是否低于最小值
+            GameArena arena = arenaManager.getArena(arenaName);
+            if (arena != null) {
+                GameInstance instance = arena.getGameInstance();
+                Set<Player> participants = instance.getParticipants();
+                int currentCount = participants.size();
+                int minPlayerCount = config.getMinPlayers();
+                
+                if (currentCount < minPlayerCount) {
+                    // 玩家数量不足，取消投票
+                    sendMessageToArena(arenaName, "§c[房间 " + arenaName + "] 玩家数量不足，投票已取消！");
+                    cancelVote(arenaName);
+                    scheduledTask.cancel();
+                    return;
+                }
             }
             
             remaining[0]--;
@@ -337,9 +353,13 @@ public class MapVoteManager {
         // 统计投票结果
         int maxVotes = -1;
         List<String> tiedMaps = new ArrayList<>();
+        int mapsWithVotes = 0;
         
         for (Map.Entry<String, Set<Player>> entry : arenaVotes.entrySet()) {
             int voteCount = entry.getValue().size();
+            if (voteCount > 0) {
+                mapsWithVotes++;
+            }
             if (voteCount > maxVotes) {
                 maxVotes = voteCount;
                 tiedMaps.clear();
@@ -369,10 +389,19 @@ public class MapVoteManager {
             selectedMapName = config.getMapName(selectedMapId);
             sendMessageToArena(arenaName, "§a[房间 " + arenaName + "] 投票结束！选中地图：§e" + selectedMapName + " §a(" + maxVotes + "票)");
         } else {
-            // 平票，在平票的地图中随机选择
-            selectedMapId = tiedMaps.get(new Random().nextInt(tiedMaps.size()));
-            selectedMapName = config.getMapName(selectedMapId);
-            sendMessageToArena(arenaName, "§a[房间 " + arenaName + "] 投票平票，随机选择：§e" + selectedMapName + " §a(" + maxVotes + "票平票)");
+            // 检查是否真的是平票：只有当多个地图都有相同最高票数时才是平票
+            // 避免只有一个地图有投票时被错误判断为平票
+            if (mapsWithVotes == 1) {
+                // 只有一个地图有投票，不是平票
+                selectedMapId = tiedMaps.get(0);
+                selectedMapName = config.getMapName(selectedMapId);
+                sendMessageToArena(arenaName, "§a[房间 " + arenaName + "] 投票结束！选中地图：§e" + selectedMapName + " §a(" + maxVotes + "票)");
+            } else {
+                // 真正的平票，在平票的地图中随机选择
+                selectedMapId = tiedMaps.get(new Random().nextInt(tiedMaps.size()));
+                selectedMapName = config.getMapName(selectedMapId);
+                sendMessageToArena(arenaName, "§a[房间 " + arenaName + "] 投票平票，随机选择：§e" + selectedMapName + " §a(" + maxVotes + "票平票)");
+            }
         }
         
         selectedMaps.put(arenaName, selectedMapId);
@@ -427,6 +456,28 @@ public class MapVoteManager {
             results.put(entry.getKey(), entry.getValue().size());
         }
         return results;
+    }
+    
+    /**
+     * 从房间的投票中移除玩家（当玩家退出时调用）
+     * @param arenaName 房间名
+     * @param player 要移除的玩家
+     */
+    public void removePlayerVote(String arenaName, Player player) {
+        Map<String, Set<Player>> arenaVotes = votes.get(arenaName);
+        if (arenaVotes == null) {
+            return;
+        }
+        
+        // 从所有地图的投票中移除该玩家
+        for (Set<Player> voters : arenaVotes.values()) {
+            voters.remove(player);
+        }
+        
+        // 如果房间正在投票，显示更新后的投票结果
+        if (isVoting(arenaName)) {
+            showVoteResults(arenaName);
+        }
     }
 }
 

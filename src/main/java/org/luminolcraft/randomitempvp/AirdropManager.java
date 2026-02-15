@@ -148,8 +148,23 @@ public class AirdropManager implements Listener {
         world.playSound(location, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 2.0f, 1.0f);
         world.playSound(location, Sound.BLOCK_ANVIL_LAND, 1.0f, 0.8f);
         
-        // 播报
-        Bukkit.broadcast(Component.text("§a§l【空投已送达】§e快去抢夺稀有装备！"));
+        // 只向游戏中的玩家播报
+        if (plugin instanceof RandomItemPVP) {
+            ArenaManager arenaManager = ((RandomItemPVP) plugin).getArenaManager();
+            if (arenaManager != null) {
+                for (String arenaName : arenaManager.getArenaNames()) {
+                    GameArena arena = arenaManager.getArena(arenaName);
+                    if (arena != null && arena.getGameInstance().isRunning()) {
+                        Set<Player> participants = arena.getGameInstance().getParticipants();
+                        for (Player p : participants) {
+                            if (p.isOnline()) {
+                                p.sendMessage("§a§l【空投已送达】§e快去抢夺稀有装备！");
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
     
     /**
@@ -407,11 +422,24 @@ public class AirdropManager implements Listener {
                 
                 // 只在第一次打开时广播（不使用标题，避免过于干扰）
                 // 聊天消息播报
-                Bukkit.broadcast(Component.text("§6§l【空投】§e" + player.getName() + " §7打开了空投箱并获得稀有装备！"));
-                
-                // 给所有玩家音效提示（更轻量）
-                for (Player p : Bukkit.getOnlinePlayers()) {
-                    p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.5f);
+                if (plugin instanceof RandomItemPVP) {
+                    ArenaManager arenaManager = ((RandomItemPVP) plugin).getArenaManager();
+                    if (arenaManager != null && arenaManager.isPlayerInArena(player)) {
+                        String arenaName = arenaManager.getPlayerArena(player);
+                        if (arenaName != null) {
+                            GameArena arena = arenaManager.getArena(arenaName);
+                            if (arena != null) {
+                                GameInstance instance = arena.getGameInstance();
+                                Set<Player> participants = instance.getParticipants();
+                                for (Player p : participants) {
+                                    if (p.isOnline()) {
+                                        p.sendMessage("§6§l【空投】§e" + player.getName() + " §7打开了空投箱并获得稀有装备！");
+                                        p.playSound(p.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.5f, 1.5f);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 
                 // 特效（只在箱子位置）

@@ -5,7 +5,7 @@
 
     <groupId>org.luminolcraft</groupId>
     <artifactId>RandomItemPVP</artifactId>
-    <version>3.0.1</version>
+    <version>4.0.0</version>
     <name>RandomItemPVP</name>
     <description>Random item PvP mini-game for Luminol/Paper 1.21.7</description>
 
@@ -82,6 +82,20 @@
             <resource>
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
+                <excludes>
+                    <exclude>**/*.db</exclude>
+                    <exclude>**/*.jar</exclude>
+                    <exclude>**/*.zip</exclude>
+                </excludes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <includes>
+                    <include>**/*.db</include>
+                    <include>**/*.jar</include>
+                    <include>**/*.zip</include>
+                </includes>
             </resource>
         </resources>
         <plugins>

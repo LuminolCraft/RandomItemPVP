@@ -354,8 +354,12 @@ public class ConfigManager {
     }
 
     public Location loadLobbyLocation() {
-        ConfigurationSection lobbySection = readSection(arenaModule, "lobby", "arena.lobby");
-        if (lobbySection == null || !lobbySection.contains("world")) {
+        if (arenaModule == null || !arenaModule.isConfigurationSection("lobby")) {
+            return null;
+        }
+        
+        ConfigurationSection lobbySection = arenaModule.getConfigurationSection("lobby");
+        if (!lobbySection.contains("world")) {
             return null;
         }
 
@@ -370,8 +374,17 @@ public class ConfigManager {
 
         World world = Bukkit.getWorld(worldName);
         if (world == null) {
-            plugin.getLogger().warning("配置文件中的大厅世界 '" + worldName + "' 不存在！");
-            return null;
+            // 尝试使用 Worlds 插件加载世界
+            try {
+                world = WorldsIntegration.loadWorld(worldName);
+            } catch (Exception e) {
+                plugin.getLogger().warning("尝试使用 Worlds 插件加载大厅世界时出错: " + e.getMessage());
+            }
+            
+            if (world == null) {
+                plugin.getLogger().warning("配置文件中的大厅世界 '" + worldName + "' 不存在！");
+                return null;
+            }
         }
 
         double x = lobbySection.getDouble("x", 0.0);
@@ -384,11 +397,13 @@ public class ConfigManager {
     }
 
     public boolean isLobbyEnabled() {
-        ConfigurationSection lobbySection = readSection(arenaModule, "lobby", "arena.lobby");
-        if (lobbySection != null && lobbySection.contains("enabled")) {
-            return lobbySection.getBoolean("enabled");
+        if (arenaModule != null && arenaModule.isConfigurationSection("lobby")) {
+            ConfigurationSection lobbySection = arenaModule.getConfigurationSection("lobby");
+            if (lobbySection.contains("enabled")) {
+                return lobbySection.getBoolean("enabled");
+            }
         }
-        return config.getBoolean("arena.lobby.enabled", true);
+        return true;
     }
 
     public int getMapStartCountdown(String mapId) {
@@ -472,33 +487,29 @@ public class ConfigManager {
      * @return 准备房间位置，如果未配置则返回null
      */
     public Location loadArenaLobbyLocation(String arenaName) {
-        // 检查mapsModule中是否有房间特定的配置
-        if (mapsModule != null) {
-            // 检查是否有arena_<房间名>配置
-            String configKey = "arena_" + arenaName;
-            ConfigurationSection arenaSection = mapsModule.getConfigurationSection(configKey);
-            if (arenaSection != null) {
-                ConfigurationSection lobbySection = arenaSection.getConfigurationSection("lobby");
-                if (lobbySection != null) {
+        // 检查arena.yml中是否有房间特定的配置
+        if (arenaModule != null) {
+            ConfigurationSection roomsSection = arenaModule.getConfigurationSection("rooms");
+            if (roomsSection != null) {
+                ConfigurationSection roomSection = roomsSection.getConfigurationSection(arenaName);
+                if (roomSection != null) {
                     // 读取房间特定的准备房间位置
-                    String worldName = lobbySection.getString("world");
-                    if (worldName == null) {
-                        return null;
+                    String worldName = roomSection.getString("world");
+                    if (worldName != null) {
+                        World world = Bukkit.getWorld(worldName);
+                        if (world == null) {
+                            plugin.getLogger().warning("房间 '" + arenaName + "' 的准备房间世界 '" + worldName + "' 不存在！");
+                            return null;
+                        }
+                        
+                        double x = roomSection.getDouble("x", 0.0);
+                        double y = roomSection.getDouble("y", 64.0);
+                        double z = roomSection.getDouble("z", 0.0);
+                        float yaw = (float) roomSection.getDouble("yaw", 0.0);
+                        float pitch = (float) roomSection.getDouble("pitch", 0.0);
+                        
+                        return new Location(world, x, y, z, yaw, pitch);
                     }
-                    
-                    World world = Bukkit.getWorld(worldName);
-                    if (world == null) {
-                        plugin.getLogger().warning("房间 '" + arenaName + "' 的准备房间世界 '" + worldName + "' 不存在！");
-                        return null;
-                    }
-                    
-                    double x = lobbySection.getDouble("x", 0.0);
-                    double y = lobbySection.getDouble("y", 64.0);
-                    double z = lobbySection.getDouble("z", 0.0);
-                    float yaw = (float) lobbySection.getDouble("yaw", 0.0);
-                    float pitch = (float) lobbySection.getDouble("pitch", 0.0);
-                    
-                    return new Location(world, x, y, z, yaw, pitch);
                 }
             }
         }
@@ -748,6 +759,39 @@ public class ConfigManager {
      */
     public boolean isMapResetPostClearFlowing() {
         return readBoolean(mapResetModule, "post-reset-clear-flowing", "map-reset.post-reset-clear-flowing", true);
+    }
+    
+    // ==========================================  
+    // 房间配置读取方法
+    // ==========================================  
+    
+    /**
+     * 读取房间的准备房间位置
+     * @param arenaName 房间名
+     * @return 准备房间位置，如果未配置则返回null
+     */
+    public Location loadRoomLobbyLocation(String arenaName) {
+        // 首先从 arena.yml 中读取 rooms 部分
+        if (arenaModule != null && arenaModule.isConfigurationSection("rooms")) {
+            ConfigurationSection roomsSection = arenaModule.getConfigurationSection("rooms");
+            if (roomsSection.isConfigurationSection(arenaName)) {
+                ConfigurationSection roomSection = roomsSection.getConfigurationSection(arenaName);
+                if (roomSection != null) {
+                    String worldName = roomSection.getString("world", "world");
+                    double x = roomSection.getDouble("x", 0.0);
+                    double y = roomSection.getDouble("y", 65.0);
+                    double z = roomSection.getDouble("z", 0.0);
+                    float yaw = (float) roomSection.getDouble("yaw", 0.0);
+                    float pitch = (float) roomSection.getDouble("pitch", 0.0);
+                    
+                    World world = Bukkit.getWorld(worldName);
+                    if (world != null) {
+                        return new Location(world, x, y, z, yaw, pitch);
+                    }
+                }
+            }
+        }
+        return null;
     }
 }
 

@@ -14,77 +14,45 @@
 # 默认地图配置
 # 当所有地图都被锁定、地图加载失败或没有可用地图时，会使用此默认地图
 # 默认地图ID必须对应下面定义的一个地图
-default-map: map1
-
-# 房间特定的准备房间配置
-# 如果多个房间使用同一张地图，但需要不同的准备房间位置，可以在此配置
-# 格式：arena_<房间名>:
-#         lobby:
-#           world: '世界key'
-#           x: X坐标
-#           y: Y坐标
-#           z: Z坐标
-#           yaw: 偏航角
-#           pitch: 俯仰角
-
-# 示例：
-# arena_room1:
-#   lobby:
-#     world: 'arena1'
-#     x: 100.0
-#     y: 65.0
-#     z: 100.0
-#     yaw: 0.0
-#     pitch: 0.0
-#
-# arena_room2:
-#   lobby:
-#     world: 'arena1'
-#     x: -100.0
-#     y: 65.0
-#     z: -100.0
-#     yaw: 0.0
-#     pitch: 0.0
-
-map1:
-  name: '地图1'        # 地图显示名称
-  world: 'world'      # Worlds 插件的世界 key（必需）
+default-map: map10
+map10:
+  name: 'air'        # 地图显示名称
+  world: 'air'      # Worlds 插件的世界 key（必需）
   x: 0.0              # X坐标
-  y: 64.0             # Y坐标
+  y: -64.0             # Y坐标
   z: 0.0              # Z坐标
   yaw: 0.0            # 视角偏航角
   pitch: 0.0          # 视角俯仰角
-  # 准备房间位置（可选，未设置则使用出生点作为准备房间）
-  lobby:
-    world: 'world'    # Worlds 插件的世界 key（可选，未设置则使用地图的世界）
-    x: 0.0            # X坐标（可选，未设置则使用地图的X坐标）
-    y: 65.0           # Y坐标（可选，未设置则使用地图的Y坐标）
-    z: 0.0            # Z坐标（可选，未设置则使用地图的Z坐标）
-    yaw: 0.0          # 视角偏航角（可选，未设置则使用地图的yaw）
-    pitch: 0.0        # 视角俯仰角（可选，未设置则使用地图的pitch）
   # 地图特定配置（可选，未设置则使用全局配置）
   radius: 50          # 初始边界半径（格）
   min-players: 2      # 最少玩家数才能开始
-  start-countdown: 15 # 准备倒计时（秒）
+  start-countdown: 30 # 准备倒计时（秒）
+  auto-start-delay: 5 # 达到最少玩家数后，延迟几秒再开始倒计时（秒，0=立即开始）
+  vote-duration: 15   # 地图投票持续时间（秒）
+
+map1:
+  name: 'lucky'        # 地图显示名称
+  world: 'lucky'      # Worlds 插件的世界 key（必需）
+  x: 0.0              # X坐标
+  y: -64.0             # Y坐标
+  z: 0.0              # Z坐标
+  yaw: 0.0            # 视角偏航角
+  pitch: 0.0          # 视角俯仰角
+  # 地图特定配置（可选，未设置则使用全局配置）
+  radius: 50          # 初始边界半径（格）
+  min-players: 2      # 最少玩家数才能开始
+  start-countdown: 30 # 准备倒计时（秒）
   auto-start-delay: 5 # 达到最少玩家数后，延迟几秒再开始倒计时（秒，0=立即开始）
   vote-duration: 15   # 地图投票持续时间（秒）
 
 map2:
-  name: '地图2'
-  world: 'world'      # Worlds 插件的世界 key（必需）
-  x: 100.0
-  y: 64.0
-  z: 100.0
+  name: 'yj'
+  world: 'yj'      # Worlds 插件的世界 key（必需）
+  x: 8
+  y: -32
+  z: 8
   yaw: 0.0
   pitch: 0.0
-  # 准备房间位置（可选，未设置则使用出生点作为准备房间）
-  lobby:
-    world: 'world'    # Worlds 插件的世界 key（可选，未设置则使用地图的世界）
-    x: 100.0          # X坐标（可选，未设置则使用地图的X坐标）
-    y: 65.0           # Y坐标（可选，未设置则使用地图的Y坐标）
-    z: 100.0          # Z坐标（可选，未设置则使用地图的Z坐标）
-    yaw: 0.0          # 视角偏航角（可选，未设置则使用地图的yaw）
-    pitch: 0.0        # 视角俯仰角（可选，未设置则使用地图的pitch）
   # 地图特定配置（可选，未设置则使用全局配置）
   radius: 48
   min-players: 2
@@ -93,21 +61,28 @@ map2:
   vote-duration: 15
 
 map3:
-  name: '地图3'
-  world: 'world'      # Worlds 插件的世界 key（必需）
-  x: -100.0
-  y: 64.0
-  z: -100.0
+  name: 'bing'
+  world: 'bing'      # Worlds 插件的世界 key（必需）
+  x: -111
+  y: 66
+  z: -12
   yaw: 0.0
   pitch: 0.0
-  # 准备房间位置（可选，未设置则使用出生点作为准备房间）
-  lobby:
-    world: 'world'    # Worlds 插件的世界 key（可选，未设置则使用地图的世界）
-    x: -100.0         # X坐标（可选，未设置则使用地图的X坐标）
-    y: 65.0           # Y坐标（可选，未设置则使用地图的Y坐标）
-    z: -100.0         # Z坐标（可选，未设置则使用地图的Z坐标）
-    yaw: 0.0          # 视角偏航角（可选，未设置则使用地图的yaw）
-    pitch: 0.0        # 视角俯仰角（可选，未设置则使用地图的pitch）
+  # 地图特定配置（可选，未设置则使用全局配置）
+  radius: 50
+  min-players: 2
+  start-countdown: 15
+  auto-start-delay: 5
+  vote-duration: 15
+
+map4:
+  name: 'mg'
+  world: 'mg'      # Worlds 插件的世界 key（必需）
+  x: -481
+  y: 75
+  z: -244
+  yaw: 0.0
+  pitch: 0.0
   # 地图特定配置（可选，未设置则使用全局配置）
   radius: 50
   min-players: 2

@@ -103,12 +103,21 @@ public class RewardManager implements Listener {
     /**
      * 播报花样死亡消息
      */
-    private void broadcastDeathMessage(Player killer, Player victim) {
+    private void broadcastDeathMessage(Player killer, Player victim, GameArena arena) {
         // 随机选择死亡消息
         String message = DEATH_MESSAGES[random.nextInt(DEATH_MESSAGES.length)];
         message = message.replace("%killer%", "§6" + killer.getName())
                          .replace("%victim%", victim.getName());
-        Bukkit.broadcast(Component.text(message));
+        // 只发送给游戏内玩家
+        if (arena != null) {
+            GameInstance gameInstance = arena.getGameInstance();
+            Set<Player> participants = gameInstance.getParticipants();
+            for (Player p : participants) {
+                if (p.isOnline()) {
+                    p.sendMessage(message);
+                }
+            }
+        }
     }
     
     /**

@@ -344,6 +344,22 @@ public class ArenaManager {
         // 加入房间
         playerArena.put(player, arenaName);
         
+        // 确保房间的准备房间位置已正确设置
+        // 优先加载房间特定的准备房间位置
+        Location arenaLobby = config.loadArenaLobbyLocation(arenaName);
+        if (arenaLobby != null) {
+            arena.setLobbyLocation(arenaLobby);
+        } else {
+            // 如果没有房间特定配置，尝试加载地图的准备房间位置
+            String currentMapId = arena.getCurrentMapId();
+            if (currentMapId != null) {
+                Location mapLobby = config.loadMapLobbyLocation(currentMapId);
+                if (mapLobby != null) {
+                    arena.setLobbyLocation(mapLobby);
+                }
+            }
+        }
+        
         // 通过 GameInstance 加入游戏
         GameInstance instance = arena.getGameInstance();
         if (instance.joinGame(player)) {

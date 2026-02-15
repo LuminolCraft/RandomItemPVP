@@ -101,20 +101,27 @@ public class GameEventListener implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        ConfigManager config = arenaManager.getConfig();
+        Location lobbyLocation = config != null ? config.loadLobbyLocation() : null;
+        
         // 检查玩家是否在某个房间中
         String arenaName = arenaManager.getPlayerArena(player);
         if (arenaName != null) {
             // 玩家在某个房间中，将其传送到大厅
-            ConfigManager config = arenaManager.getConfig();
-            if (config != null) {
-                Location lobbyLocation = config.loadLobbyLocation();
-                if (lobbyLocation != null && config.isLobbyEnabled()) {
-                    player.teleport(lobbyLocation);
-                    player.sendMessage("§c[随机物品PVP] 你已重连，被传送到大厅！");
-                }
+            if (lobbyLocation != null && config != null && config.isLobbyEnabled()) {
+                player.teleport(lobbyLocation);
+                player.sendMessage("§c[随机物品PVP] 你已重连，被传送到大厅！");
             }
             // 从房间中移除玩家
             arenaManager.removePlayerFromArena(player);
+        } else {
+            // 新玩家首次加入服务器，将其传送到大厅
+            if (lobbyLocation != null && config != null && config.isLobbyEnabled()) {
+                player.teleport(lobbyLocation);
+                // 设置重生点为大厅位置
+                player.setBedSpawnLocation(lobbyLocation, true);
+                player.sendMessage("§a[随机物品PVP] 欢迎加入！已传送到大厅。");
+            }
         }
     }
 

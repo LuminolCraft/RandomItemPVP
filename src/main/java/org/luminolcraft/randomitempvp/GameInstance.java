@@ -77,7 +77,14 @@ public class GameInstance {
      * 玩家加入游戏
      */
     public boolean joinGame(Player player) {
-        if (gameRunning) return false;
+        // 检查游戏状态
+        if (gameRunning) {
+            player.sendMessage("§c游戏已经开始，无法加入！");
+            return false;
+        }
+        
+        // 同步房间状态
+        arena.syncStatus();
         
         // 如果玩家已经在列表中，允许重新加入（更新原始位置和传送）
         participants.add(player);
@@ -119,6 +126,9 @@ public class GameInstance {
                 player.sendMessage("§a已传送到房间准备区域！");
                 player.sendMessage("§7等待其他玩家加入...");
             });
+        } else {
+            player.sendMessage("§c无法传送到准备区域，位置未设置！");
+            return false;
         }
         
         return true; // 无论是新玩家还是已存在的玩家，都返回 true
@@ -134,12 +144,21 @@ public class GameInstance {
         // 从已准备列表中移除
         readyPlayers.remove(player);
         
+        // 从投票中移除玩家
+        RandomItemPVP pluginInstance = RandomItemPVP.getInstance();
+        if (pluginInstance != null) {
+            MapVoteManager voteManager = pluginInstance.getMapVoteManager();
+            if (voteManager != null) {
+                voteManager.removePlayerVote(arena.getArenaName(), player);
+            }
+        }
+        
         // 如果正在进行快速倒计时，取消它
         if (fastCountdownActive && countdownTask != null) {
             countdownTask.cancel();
             countdownTask = null;
             fastCountdownActive = false;
-            Bukkit.broadcastMessage("§e[房间 " + arena.getArenaName() + "] 玩家离开，快速倒计时已取消，等待所有玩家准备...");
+            for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§e[房间 " + arena.getArenaName() + "] 玩家离开，快速倒计时已取消，等待所有玩家准备..."); } }
         }
         
         // 恢复原始物品（如果有保存）
@@ -173,6 +192,15 @@ public class GameInstance {
         // 从存活列表中移除（在移除participants之前）
         alivePlayers.remove(player);
         
+        // 从投票中移除玩家
+        RandomItemPVP pluginInstance = RandomItemPVP.getInstance();
+        if (pluginInstance != null) {
+            MapVoteManager voteManager = pluginInstance.getMapVoteManager();
+            if (voteManager != null) {
+                voteManager.removePlayerVote(arena.getArenaName(), player);
+            }
+        }
+        
         // 如果游戏正在运行，先检查是否应该结束游戏（在移除participants之前）
         if (gameRunning) {
             // 先移除当前玩家，然后检查剩余存活玩家
@@ -187,7 +215,7 @@ public class GameInstance {
                 // 5秒延迟后再处理结果
                 Bukkit.getGlobalRegionScheduler().runDelayed(plugin, task -> {
                     if (survivors.isEmpty()) {
-                        Bukkit.broadcastMessage("§c[房间 " + arena.getArenaName() + "] 游戏结束！所有玩家都已离开！");
+                        for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§c[房间 " + arena.getArenaName() + "] 游戏结束！所有玩家都已离开！"); } }
                         // 所有玩家都离开了，记录失败
                         for (Player p : participants) {
                             if (p.isOnline()) {
@@ -196,7 +224,7 @@ public class GameInstance {
                         }
                     } else {
                         Player winner = survivors.get(0);
-                        Bukkit.broadcastMessage("§a[房间 " + arena.getArenaName() + "] §6" + winner.getName() + " §a获胜！");
+                        for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§a[房间 " + arena.getArenaName() + "] §6" + winner.getName() + " §a获胜！"); } }
                         statsManager.recordWin(winner);
                         // 失败者记录失败
                         for (Player p : participants) {
@@ -530,7 +558,7 @@ public class GameInstance {
                         p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.5f);
                     }
                 }
-                Bukkit.broadcastMessage("§e[房间 " + arena.getArenaName() + "] 游戏将在 §6" + remaining + " §e秒后开始... (参与者：§6" + participants.size() + "§e人)");
+                for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§e[房间 " + arena.getArenaName() + "] 游戏将在 §6" + remaining + " §e秒后开始... (参与者：§6" + participants.size() + "§e人)"); } }
             } else if (remaining <= 10) {
                 // 10秒内：标题 + 音效
                 for (Player p : roomPlayers) {
@@ -539,7 +567,7 @@ public class GameInstance {
                         p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_HARP, 0.8f, 1.0f);
                     }
                 }
-                Bukkit.broadcastMessage("§e[房间 " + arena.getArenaName() + "] 游戏将在 §6" + remaining + " §e秒后开始... (参与者：§6" + participants.size() + "§e人)");
+                for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§e[房间 " + arena.getArenaName() + "] 游戏将在 §6" + remaining + " §e秒后开始... (参与者：§6" + participants.size() + "§e人)"); } }
             } else {
                 // 10秒以上：标题（较小） + 聊天消息
                 for (Player p : roomPlayers) {
@@ -547,7 +575,7 @@ public class GameInstance {
                         p.sendTitle("", "§7游戏将在 §e" + remaining + "§7 秒后开始 (参与者：§6" + participants.size() + "§7人)", 5, 20, 5);
                     }
                 }
-                Bukkit.broadcastMessage("§e[房间 " + arena.getArenaName() + "] 游戏将在 §6" + remaining + " §e秒后开始... (参与者：§6" + participants.size() + "§e人)");
+                for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§e[房间 " + arena.getArenaName() + "] 游戏将在 §6" + remaining + " §e秒后开始... (参与者：§6" + participants.size() + "§e人)"); } }
             }
             
             currentCount[0]--;
@@ -579,7 +607,7 @@ public class GameInstance {
         
         participants.clear();
         gatherLocation = null;
-        Bukkit.broadcastMessage("§c[房间 " + arena.getArenaName() + "] 游戏已取消！");
+        for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§c[房间 " + arena.getArenaName() + "] 游戏已取消！"); } }
     }
     
     /**
@@ -601,7 +629,7 @@ public class GameInstance {
         int totalCount = participants.size();
         String readyMessage = "§e[房间 " + arena.getArenaName() + "] 玩家 §6" + player.getName() + "§e 已准备就绪！";
         readyMessage += " §7(" + readyCount + "/" + totalCount + ")";
-        Bukkit.broadcastMessage(readyMessage);
+        for (Player p : participants) { if (p.isOnline()) { p.sendMessage(readyMessage); } }
         
         // 检查是否所有玩家都已准备
         if (readyCount >= totalCount && totalCount >= 1) {
@@ -631,14 +659,14 @@ public class GameInstance {
         int totalCount = participants.size();
         String unreadyMessage = "§e[房间 " + arena.getArenaName() + "] 玩家 §6" + player.getName() + "§e 已取消准备！";
         unreadyMessage += " §7(" + readyCount + "/" + totalCount + ")";
-        Bukkit.broadcastMessage(unreadyMessage);
+        for (Player p : participants) { if (p.isOnline()) { p.sendMessage(unreadyMessage); } }
         
         // 如果正在进行快速倒计时，取消它
         if (fastCountdownActive && countdownTask != null) {
             countdownTask.cancel();
             countdownTask = null;
             fastCountdownActive = false;
-            Bukkit.broadcastMessage("§e[房间 " + arena.getArenaName() + "] 快速倒计时已取消，等待所有玩家准备...");
+            for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§e[房间 " + arena.getArenaName() + "] 快速倒计时已取消，等待所有玩家准备..."); } }
         }
         
         return true;
@@ -684,7 +712,7 @@ public class GameInstance {
                 String currentMapId = arena.getCurrentMapId();
                 int minPlayers = currentMapId != null ? config.getMapMinPlayers(currentMapId) : config.getMinPlayers();
                 if (participants.size() < minPlayers) {
-                    Bukkit.broadcastMessage("§c[房间 " + arena.getArenaName() + "] 参与者不足！游戏取消。需要至少 " + minPlayers + " 人");
+                    for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§c[房间 " + arena.getArenaName() + "] 参与者不足！游戏取消。需要至少 " + minPlayers + " 人"); } }
                     cancelGame();
                     return;
                 }
@@ -704,7 +732,7 @@ public class GameInstance {
                         p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0f, 1.5f);
                     }
                 }
-                Bukkit.broadcastMessage("§e[房间 " + arena.getArenaName() + "] 游戏将在 §6" + remaining + " §e秒后开始... (快速倒计时)");
+                for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§e[房间 " + arena.getArenaName() + "] 游戏将在 §6" + remaining + " §e秒后开始... (快速倒计时)"); } }
             } else {
                 // 显示倒计时
                 for (Player p : roomPlayers) {
@@ -712,7 +740,7 @@ public class GameInstance {
                         p.sendTitle("", "§7游戏将在 §e" + remaining + "§7 秒后开始 (快速倒计时)", 5, 20, 5);
                     }
                 }
-                Bukkit.broadcastMessage("§e[房间 " + arena.getArenaName() + "] 游戏将在 §6" + remaining + " §e秒后开始... (快速倒计时)");
+                for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§e[房间 " + arena.getArenaName() + "] 游戏将在 §6" + remaining + " §e秒后开始... (快速倒计时)"); } }
             }
             
             currentCount[0]--;
@@ -793,6 +821,11 @@ public class GameInstance {
             // 边界直径 = 半径 * 2
             double initialSize = initialRadius * 2;
             gameBorder.setSize(initialSize, 0);
+            // 重置边界中心到出生点
+            Location spawnLoc = arena.getSpawnLocation();
+            if (spawnLoc != null) {
+                gameBorder.setCenter(spawnLoc);
+            }
         }
         
         // 然后设置准备和运行标志为 false
@@ -946,7 +979,7 @@ public class GameInstance {
         spawnLocation = null;
         gameBorder = null;
         
-        Bukkit.broadcastMessage("§c[房间 " + arena.getArenaName() + "] 房间已删除，游戏已强制停止！");
+        for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§c[房间 " + arena.getArenaName() + "] 房间已删除，游戏已强制停止！"); } }
     }
     
     /**
@@ -959,7 +992,7 @@ public class GameInstance {
         // 获取出生点
         spawnLocation = arena.getSpawnLocation();
         if (spawnLocation == null) {
-            Bukkit.broadcastMessage("§c[房间 " + arena.getArenaName() + "] 错误：未设置游戏出生点！");
+            for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§c[房间 " + arena.getArenaName() + "] 错误：未设置游戏出生点！"); } }
             gameRunning = false;
             arena.setStatus(GameArena.ArenaStatus.WAITING);
             return;
@@ -1046,7 +1079,7 @@ public class GameInstance {
         // 获取游戏世界
         World gameWorld = spawnLocation.getWorld();
         if (gameWorld == null) {
-            Bukkit.broadcastMessage("§c[房间 " + arena.getArenaName() + "] 错误：游戏世界为 null！");
+            for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§c[房间 " + arena.getArenaName() + "] 错误：游戏世界为 null！"); } }
             gameRunning = false;
             arena.setStatus(GameArena.ArenaStatus.WAITING);
             return;
@@ -1071,15 +1104,21 @@ public class GameInstance {
         }
         
         // 方块操作必须在区域调度器中执行（Folia 要求）
-        Bukkit.getRegionScheduler().run(plugin, spawnLocation, task -> {
-            generateArena();
-        });
         setupWorldBorder();
         resetPlayers();
         startItemTask();
         startEventTask();
         startBorderShrink();
-        startBorderDamage();
+        
+        // 生成竞技场并传送玩家，然后延迟启动边界伤害
+        Bukkit.getRegionScheduler().run(plugin, spawnLocation, task -> {
+            generateArena();
+            
+            // 延迟2秒启动边界伤害，确保玩家已经传送到基岩柱子上
+            Bukkit.getGlobalRegionScheduler().runDelayed(plugin, delayTask -> {
+                startBorderDamage();
+            }, 40); // 2秒 = 40 ticks
+        });
         
         // 启动空投系统（多房间系统）
         AirdropManager airdropManager = RandomItemPVP.getInstance().getAirdropManager();
@@ -1087,9 +1126,14 @@ public class GameInstance {
             airdropManager.startAirdropForArena(arena.getArenaName(), spawnLocation);
         }
         
-        Bukkit.broadcastMessage("§a[房间 " + arena.getArenaName() + "] 新一轮随机物品PVP开始！");
-        Bukkit.broadcastMessage("§e击杀敌人可获得回血和随机物品奖励！");
-        Bukkit.broadcastMessage("§6空投系统已激活，稀有装备即将空降！");
+        // 只向游戏内玩家发送消息，不进行全服广播
+        for (Player p : participants) {
+            if (p.isOnline()) {
+                p.sendMessage("§a[房间 " + arena.getArenaName() + "] 新一轮随机物品PVP开始！");
+                p.sendMessage("§e击杀敌人可获得回血和随机物品奖励！");
+                p.sendMessage("§6空投系统已激活，稀有装备即将空降！");
+            }
+        }
         
         // 启动存活人数显示
         startAliveCountDisplay();
@@ -1199,11 +1243,44 @@ public class GameInstance {
             int pillarX = spawnLocation.getBlockX() + (int)(Math.cos(angle) * circleRadius);
             int pillarZ = spawnLocation.getBlockZ() + (int)(Math.sin(angle) * circleRadius);
             
+            // 边界检查：确保生成位置在世界边界内
+            if (gameBorder != null) {
+                Location borderCenter = gameBorder.getCenter();
+                double borderRadius = gameBorder.getSize() / 2.0;
+                
+                double distance = Math.sqrt(
+                    Math.pow(pillarX - borderCenter.getX(), 2) + 
+                    Math.pow(pillarZ - borderCenter.getZ(), 2)
+                );
+                
+                // 如果位置在边界外，调整到边界内
+                if (distance > borderRadius - 2) { // 留出2格缓冲区
+                    // 计算从中心到当前位置的单位向量
+                    double dx = pillarX - borderCenter.getX();
+                    double dz = pillarZ - borderCenter.getZ();
+                    double length = Math.sqrt(dx * dx + dz * dz);
+                    
+                    if (length > 0) {
+                        // 调整到边界内
+                        double scale = (borderRadius - 2) / length;
+                        pillarX = (int)(borderCenter.getX() + dx * scale);
+                        pillarZ = (int)(borderCenter.getZ() + dz * scale);
+                    }
+                }
+            }
+            
             // 使用固定高度，确保安全（避免区块未加载或虚空问题）
             int groundY = baseGroundY;
             
+            // 为 lambda 表达式创建变量副本，确保它们是 effectively final
+            final int finalPillarX = pillarX;
+            final int finalPillarZ = pillarZ;
+            final int finalGroundY = groundY;
+            final double finalAngle = angle;
+            final int finalPillarHeight = pillarHeight;
+            
             // 确保区块已加载
-            Location pillarBaseLoc = new Location(world, pillarX, groundY, pillarZ);
+            Location pillarBaseLoc = new Location(world, finalPillarX, finalGroundY, finalPillarZ);
             Chunk chunk = pillarBaseLoc.getChunk();
             if (!chunk.isLoaded()) {
                 chunk.load();
@@ -1211,9 +1288,9 @@ public class GameInstance {
             
             // 使用区域调度器生成基岩柱（确保在正确的线程上执行）
             Bukkit.getRegionScheduler().run(plugin, pillarBaseLoc, task -> {
-                // 先生成128格高的基岩柱子（从地面向上）
-                for (int y = 0; y < pillarHeight; y++) {
-                    Location bedrockLoc = new Location(world, pillarX, groundY + y, pillarZ);
+                // 生成128格高的基岩柱子（从地面向上）
+                for (int y = 0; y < 128; y++) { // 直接使用128，确保柱子高度为128格
+                    Location bedrockLoc = new Location(world, finalPillarX, finalGroundY + y, finalPillarZ);
                     Block block = bedrockLoc.getBlock();
                     block.setType(Material.BEDROCK);
                 }
@@ -1221,15 +1298,15 @@ public class GameInstance {
                 // 在柱子顶部生成一个3x3的平台，防止玩家掉下去
                 for (int x = -1; x <= 1; x++) {
                     for (int z = -1; z <= 1; z++) {
-                        Location platformLoc = new Location(world, pillarX + x, groundY + pillarHeight, pillarZ + z);
+                        Location platformLoc = new Location(world, finalPillarX + x, finalGroundY + finalPillarHeight, finalPillarZ + z);
                         Block platformBlock = platformLoc.getBlock();
                         platformBlock.setType(Material.WHITE_STAINED_GLASS);
                     }
                 }
                 
                 // 传送玩家到柱子顶部的平台上（+1 是站在平台上方）
-                Location playerSpawn = new Location(world, pillarX + 0.5, groundY + pillarHeight + 1, pillarZ + 0.5,
-                    (float)(angle * 180 / Math.PI + 90), // 面向中心
+                Location playerSpawn = new Location(world, finalPillarX + 0.5, finalGroundY + 128 + 1, finalPillarZ + 0.5,
+                    (float)(finalAngle * 180 / Math.PI + 90), // 面向中心
                     0);
                 
                 // 使用玩家调度器传送玩家
@@ -1689,13 +1766,13 @@ public class GameInstance {
             double minSize = config.getMinBorderSize();
             if (currentSize <= minSize) { 
                 task.cancel(); 
-                Bukkit.broadcastMessage("§c[房间 " + arena.getArenaName() + "] 边界已缩小到最小范围（" + minSize + "格）！"); 
+                for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§c[房间 " + arena.getArenaName() + "] 边界已缩小到最小范围（" + minSize + "格）！"); } } 
                 return; 
             }
             double newSize = Math.max(minSize, currentSize - config.getShrinkAmount());
             long shrinkSeconds = config.getShrinkInterval() / 20;
             gameBorder.setSize(newSize, shrinkSeconds);
-            Bukkit.broadcastMessage("§e[房间 " + arena.getArenaName() + "] 边界正在缩小！当前直径：§6" + (int)newSize + "格");
+            for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§e[房间 " + arena.getArenaName() + "] 边界正在缩小！当前直径：§6" + (int)newSize + "格"); } }
             for (Player p : getSurvivingPlayers()) p.playSound(p.getLocation(), Sound.BLOCK_ANVIL_LAND, 1.0f, 1.0f);
         }, delay, interval);
     }
@@ -1784,7 +1861,7 @@ public class GameInstance {
             if (alive != lastAliveCount) {
                 // 最后5人提示
                 if (alive == 5 && alive < total) {
-                    Bukkit.broadcast(net.kyori.adventure.text.Component.text("§c§l【最后5人】§e决战时刻到来！"));
+                    for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§c§l【最后5人】§e决战时刻到来！"); } }
                     for (Player p : participants) {
                         if (p.isOnline()) {
                             p.playSound(p.getLocation(), Sound.ENTITY_WITHER_SPAWN, 0.5f, 1.5f);
@@ -1794,7 +1871,7 @@ public class GameInstance {
                 
                 // 最后3人提示
                 if (alive == 3 && alive < total) {
-                    Bukkit.broadcast(net.kyori.adventure.text.Component.text("§6§l【最后3人】§e谁能笑到最后？"));
+                    for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§6§l【最后3人】§e谁能笑到最后？"); } }
                     for (Player p : participants) {
                         if (p.isOnline()) {
                             p.playSound(p.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 1.0f, 1.0f);
@@ -1804,7 +1881,7 @@ public class GameInstance {
                 
                 // 最后2人提示
                 if (alive == 2 && alive < total) {
-                    Bukkit.broadcast(net.kyori.adventure.text.Component.text("§4§l【最后2人】§c巅峰对决！"));
+                    for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§4§l【最后2人】§c巅峰对决！"); } }
                     for (Player p : participants) {
                         if (p.isOnline()) {
                             p.playSound(p.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0f, 0.8f);
@@ -1847,7 +1924,7 @@ public class GameInstance {
                 killer.getInventory().addItem(reward);
             }
             
-            Bukkit.broadcastMessage("§a[房间 " + arena.getArenaName() + "] §6" + killer.getName() + " §a击杀了 §c" + player.getName() + "§a！");
+            for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§a[房间 " + arena.getArenaName() + "] §6" + killer.getName() + " §a击杀了 §c" + player.getName() + "§a！"); } }
         } else {
             statsManager.recordDeath(player);
         }
@@ -1861,14 +1938,14 @@ public class GameInstance {
             // 5秒延迟后再处理结果
             Bukkit.getGlobalRegionScheduler().runDelayed(plugin, task -> {
                 if (survivors.isEmpty()) {
-                    Bukkit.broadcastMessage("§c[房间 " + arena.getArenaName() + "] 游戏结束！所有玩家都已死亡！");
+                    for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§c[房间 " + arena.getArenaName() + "] 游戏结束！所有玩家都已死亡！"); } }
                     // 所有玩家都死了，记录失败
                     for (Player p : participants) {
                         statsManager.recordLoss(p);
                     }
                 } else {
                     Player winner = survivors.get(0);
-                    Bukkit.broadcastMessage("§a[房间 " + arena.getArenaName() + "] §6" + winner.getName() + " §a获胜！");
+                    for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§a[房间 " + arena.getArenaName() + "] §6" + winner.getName() + " §a获胜！"); } }
                     statsManager.recordWin(winner);
                     // 失败者记录失败
                     for (Player p : participants) {
@@ -1987,6 +2064,15 @@ public class GameInstance {
         // 从存活列表中移除
         alivePlayers.remove(player);
         
+        // 从投票中移除玩家
+        RandomItemPVP pluginInstance = RandomItemPVP.getInstance();
+        if (pluginInstance != null) {
+            MapVoteManager voteManager = pluginInstance.getMapVoteManager();
+            if (voteManager != null) {
+                voteManager.removePlayerVote(arena.getArenaName(), player);
+            }
+        }
+        
         // 如果游戏正在运行，检查游戏是否结束
         if (gameRunning) {
             // 向房间内的玩家发送消息
@@ -2042,7 +2128,6 @@ public class GameInstance {
         playerGameModes.remove(player);
         
         // 从 ArenaManager 的玩家房间映射中移除
-        RandomItemPVP pluginInstance = RandomItemPVP.getInstance();
         if (pluginInstance != null) {
             ArenaManager arenaManager = pluginInstance.getArenaManager();
             if (arenaManager != null) {
@@ -2091,6 +2176,11 @@ public class GameInstance {
             // 边界直径 = 半径 * 2
             double initialSize = initialRadius * 2;
             gameBorder.setSize(initialSize, 0);
+            // 重置边界中心到出生点
+            Location spawnLoc = arena.getSpawnLocation();
+            if (spawnLoc != null) {
+                gameBorder.setCenter(spawnLoc);
+            }
         }
         
         // 先恢复玩家游戏模式和物品（在大厅传送前）
@@ -2126,18 +2216,22 @@ public class GameInstance {
             // 传送所有参与者回大厅
             for (Player player : new ArrayList<>(participants)) {
                 if (player.isOnline()) {
-                    Location safeLobby = findSafeLocation(lobbyLocation);
-                    if (safeLobby != null) {
-                        player.teleportAsync(safeLobby).thenRun(() -> {
-                            player.sendMessage("§a已传送回大厅！");
-                        });
-                    } else {
-                        // 如果找不到安全位置，尝试使用原始大厅位置
-                        player.teleportAsync(lobbyLocation).thenRun(() -> {
-                            player.sendMessage("§a已传送回大厅！");
-                        });
+                        Location safeLobby = findSafeLocation(lobbyLocation);
+                        if (safeLobby != null) {
+                            player.teleportAsync(safeLobby).thenRun(() -> {
+                                // 设置重生点为大厅位置
+                                player.setBedSpawnLocation(safeLobby, true);
+                                player.sendMessage("§a已传送回大厅！");
+                            });
+                        } else {
+                            // 如果找不到安全位置，尝试使用原始大厅位置
+                            player.teleportAsync(lobbyLocation).thenRun(() -> {
+                                // 设置重生点为大厅位置
+                                player.setBedSpawnLocation(lobbyLocation, true);
+                                player.sendMessage("§a已传送回大厅！");
+                            });
+                        }
                     }
-                }
             }
             
             // 传送观战者回大厅
@@ -2165,10 +2259,14 @@ public class GameInstance {
                     Location safeLobby = findSafeLocation(lobbyLocation);
                     if (safeLobby != null) {
                         spectator.teleportAsync(safeLobby).thenRun(() -> {
+                            // 设置重生点为大厅位置
+                            spectator.setBedSpawnLocation(safeLobby, true);
                             spectator.sendMessage("§a已传送回大厅！");
                         });
                     } else {
                         spectator.teleportAsync(lobbyLocation).thenRun(() -> {
+                            // 设置重生点为大厅位置
+                            spectator.setBedSpawnLocation(lobbyLocation, true);
                             spectator.sendMessage("§a已传送回大厅！");
                         });
                     }
@@ -2243,6 +2341,8 @@ public class GameInstance {
             Bukkit.getGlobalRegionScheduler().runDelayed(plugin, task -> {
                 plugin.getLogger().info("[房间 " + arena.getArenaName() + "] 开始重置地图...");
                 mapResetter.resetMap();
+                // 注意：MapResetter实例会在重置完成后自动销毁，避免过早调用destroy()导致数据被提前清理
+                // 这里只需要将引用置为null，让GC可以回收
                 mapResetter = null;
             }, 60L); // 3秒后开始重置
         }

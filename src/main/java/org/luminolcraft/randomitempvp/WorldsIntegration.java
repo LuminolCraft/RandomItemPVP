@@ -399,6 +399,24 @@ public class WorldsIntegration {
             // 忽略
         }
         
+        // 尝试查找 read 方法（用于加载世界）
+        try {
+            methodLoadWorld = findMethodFlexible(apiClass, "read", 1);
+            if (methodLoadWorld != null) {
+                hasAtLeastOneMethod = true;
+            }
+        } catch (Exception e) {
+            // 尝试其他可能的方法名
+            try {
+                methodLoadWorld = findMethodFlexible(apiClass, "loadWorld", 1);
+                if (methodLoadWorld != null) {
+                    hasAtLeastOneMethod = true;
+                }
+            } catch (Exception e2) {
+                // 忽略
+            }
+        }
+        
         // 尝试查找 findFreeName 和 cloneAsync 来实现 getOrCreateWorldInstance
         try {
             // 使用 findFreeName + cloneAsync 来实现

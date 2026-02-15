@@ -6,7 +6,7 @@
 # ==========================================
 
 # 边界设置
-damage: 3.0                         # 穿越边界每秒扣血量（1.0 = 0.5颗心）
+damage: 4.0                         # 穿越边界每秒扣血量（1.0 = 0.5颗心）
 min_diameter: 10                    # 边界最小直径（格）
 shrink_amount_per_interval: 6.0     # 每次缩圈减少的直径（格）
 shrink_interval_ticks: 600          # 缩圈间隔（ticks，20ticks=1秒）
