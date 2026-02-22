@@ -322,15 +322,9 @@ ls target/RandomItemPVP-*.jar
 
 1. 首次启动后，插件会自动创建配置文件
 
-2. 进入游戏，使用管理员权限设置游戏出生点：
+2. 根据需要编辑配置文件（见[配置说明](#配置说明)）
 
-```bash
-/ripvp setspawn
-```
-
-3. 根据需要编辑配置文件（见[配置说明](#配置说明)）
-
-4. 使用指令重载配置：
+3. 使用指令重载配置：
 
 ```bash
 /ripvp reload
@@ -589,13 +583,9 @@ debug:
 
 | 指令 | 描述 | 所需权限 |
 |------|------|----------|
-| `/ripvp setspawn` | 设置游戏出生点 | `randomitempvp.admin` |
 | `/ripvp reload` | 重载所有配置文件 | `randomitempvp.admin` |
-| `/ripvp forceend` | 强制结束当前游戏 | `randomitempvp.admin` |
-| `/ripvp forcestart` | 强制开始当前游戏 | `randomitempvp.admin` |
 | `/ripvp resetstats <玩家名>` | 重置指定玩家统计数据 | `randomitempvp.admin` |
 | `/ripvp resetallstats` | 重置所有玩家统计数据 | `randomitempvp.admin` |
-| `/ripvp create <房间名>` | 创建新游戏房间 | `randomitempvp.admin` |
 | `/ripvp delete <房间名>` | 删除指定游戏房间 | `randomitempvp.admin` |
 | `/ripvp list` | 列出所有游戏房间 | `randomitempvp.admin` |
 | `/ripvptp <房间名>` | 传送到指定房间 | `randomitempvp.admin` |
@@ -719,7 +709,6 @@ room2:
 | `/ripvp list` | 列出所有房间及状态 |
 | `/ripvp join <房间名>` | 加入指定房间 |
 | `/ripvptp <房间名>` | 传送到指定房间 |
-| `/ripvp setspawn <房间名>` | 设置指定房间的游戏出生点 |
 | `/ripvp reload <房间名>` | 重载指定房间配置 |
 
 ---
