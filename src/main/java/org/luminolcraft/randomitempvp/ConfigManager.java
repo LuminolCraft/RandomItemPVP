@@ -21,6 +21,7 @@ import java.util.Map;
 public class ConfigManager {
     private final JavaPlugin plugin;
     private FileConfiguration config;
+    private DebugLogger debugLogger;
 
     private File arenaModuleFile;
     private FileConfiguration arenaModule;
@@ -43,6 +44,14 @@ public class ConfigManager {
 
     public ConfigManager(JavaPlugin plugin) {
         this.plugin = plugin;
+    }
+    
+    /**
+     * 设置调试日志管理器
+     * @param debugLogger 调试日志管理器实例
+     */
+    public void setDebugLogger(DebugLogger debugLogger) {
+        this.debugLogger = debugLogger;
     }
 
     public void loadConfig() {
@@ -121,7 +130,7 @@ public class ConfigManager {
         try {
             module.save(file);
         } catch (IOException e) {
-            plugin.getLogger().warning("无法写入模块配置 " + label + " ：" + e.getMessage());
+            debugLogger.warning("无法写入模块配置 " + label + " ：" + e.getMessage());
         }
     }
 
@@ -216,13 +225,13 @@ public class ConfigManager {
                         weights.put(material, weight);
                     }
                 } catch (IllegalArgumentException e) {
-                    plugin.getLogger().warning("无效的物品类型配置: " + key);
+                    debugLogger.warning("无效的物品类型配置: " + key);
                 }
             }
         }
 
         if (weights.isEmpty()) {
-            plugin.getLogger().warning("配置文件中未找到任何物品权重配置！将使用默认物品。");
+            debugLogger.warning("配置文件中未找到任何物品权重配置！将使用默认物品。");
             weights.put(Material.IRON_SWORD, 10);
             weights.put(Material.BOW, 10);
             weights.put(Material.ARROW, 20);
@@ -315,11 +324,11 @@ public class ConfigManager {
                     world = Bukkit.createWorld(new org.bukkit.WorldCreator(worldName));
                 }
             } catch (Exception e) {
-                plugin.getLogger().warning("尝试加载世界 '" + worldName + "' 时出错: " + e.getMessage());
+                debugLogger.warning("尝试加载世界 '" + worldName + "' 时出错: " + e.getMessage());
             }
             
             if (world == null) {
-                plugin.getLogger().warning("地图 '" + mapId + "' 的世界 '" + worldName + "' 不存在！");
+                debugLogger.warning("地图 '" + mapId + "' 的世界 '" + worldName + "' 不存在！");
                 return null;
             }
         }
@@ -355,36 +364,47 @@ public class ConfigManager {
 
     public Location loadLobbyLocation() {
         if (arenaModule == null || !arenaModule.isConfigurationSection("lobby")) {
+            debugLogger.warning("arena.yml 中没有 lobby 配置部分！");
             return null;
         }
         
         ConfigurationSection lobbySection = arenaModule.getConfigurationSection("lobby");
         if (!lobbySection.contains("world")) {
+            debugLogger.warning("arena.yml 中 lobby 配置缺少 world 字段！");
             return null;
         }
 
         if (!lobbySection.getBoolean("enabled", true)) {
+            debugLogger.info("arena.yml 中 lobby 配置已禁用！");
             return null;
         }
 
         String worldName = lobbySection.getString("world");
         if (worldName == null) {
+            debugLogger.warning("arena.yml 中 lobby 配置的 world 字段为空！");
             return null;
         }
 
+        debugLogger.info("正在加载大厅世界: " + worldName);
         World world = Bukkit.getWorld(worldName);
         if (world == null) {
             // 尝试使用 Worlds 插件加载世界
             try {
+                debugLogger.info("Bukkit 未找到大厅世界，尝试使用 Worlds 插件加载: " + worldName);
                 world = WorldsIntegration.loadWorld(worldName);
+                if (world != null) {
+                    debugLogger.info("使用 Worlds 插件成功加载大厅世界: " + worldName);
+                }
             } catch (Exception e) {
-                plugin.getLogger().warning("尝试使用 Worlds 插件加载大厅世界时出错: " + e.getMessage());
+                debugLogger.warning("尝试使用 Worlds 插件加载大厅世界时出错: " + e.getMessage());
             }
             
             if (world == null) {
-                plugin.getLogger().warning("配置文件中的大厅世界 '" + worldName + "' 不存在！");
+                debugLogger.warning("配置文件中的大厅世界 '" + worldName + "' 不存在！");
                 return null;
             }
+        } else {
+            debugLogger.info("使用 Bukkit 成功加载大厅世界: " + worldName);
         }
 
         double x = lobbySection.getDouble("x", 0.0);
@@ -393,7 +413,9 @@ public class ConfigManager {
         float yaw = (float) lobbySection.getDouble("yaw", 0.0);
         float pitch = (float) lobbySection.getDouble("pitch", 0.0);
 
-        return new Location(world, x, y, z, yaw, pitch);
+        Location lobbyLocation = new Location(world, x, y, z, yaw, pitch);
+        debugLogger.info("成功加载大厅位置: " + lobbyLocation.toString());
+        return lobbyLocation;
     }
 
     public boolean isLobbyEnabled() {
@@ -411,7 +433,7 @@ public class ConfigManager {
         if (section != null && section.contains("start-countdown")) {
             return section.getInt("start-countdown");
         }
-        return getStartCountdown();
+        return getStartCountdown(); // 从配置文件获取默认值
     }
 
     public int getMapMinPlayers(String mapId) {
@@ -419,7 +441,7 @@ public class ConfigManager {
         if (section != null && section.contains("min-players")) {
             return section.getInt("min-players");
         }
-        return getMinPlayers();
+        return getMinPlayers(); // 从配置文件获取默认值
     }
 
     public int getMapRadius(String mapId) {
@@ -427,7 +449,7 @@ public class ConfigManager {
         if (section != null && section.contains("radius")) {
             return section.getInt("radius");
         }
-        return getArenaRadius();
+        return getArenaRadius(); // 从配置文件获取默认值
     }
 
     public int getMapVoteDuration(String mapId) {
@@ -435,7 +457,91 @@ public class ConfigManager {
         if (section != null && section.contains("vote-duration")) {
             return section.getInt("vote-duration");
         }
-        return getVoteDuration();
+        return getVoteDuration(); // 从配置文件获取默认值
+    }
+    
+    /**
+     * 获取房间特定的准备倒计时配置
+     * @param arenaName 房间名
+     * @param mapId 地图ID
+     * @return 倒计时秒数
+     */
+    public int getRoomStartCountdown(String arenaName, String mapId) {
+        // 首先检查房间特定的配置
+        if (arenaModule != null) {
+            ConfigurationSection roomsSection = arenaModule.getConfigurationSection("rooms");
+            if (roomsSection != null) {
+                ConfigurationSection roomSection = roomsSection.getConfigurationSection(arenaName);
+                if (roomSection != null && roomSection.contains("start-countdown")) {
+                    return roomSection.getInt("start-countdown");
+                }
+            }
+        }
+        
+        // 如果房间没有配置，使用地图特定的配置
+        if (mapId != null) {
+            int mapCountdown = getMapStartCountdown(mapId);
+            return mapCountdown;
+        }
+        
+        // 如果地图也没有配置，返回30秒
+        return 30;
+    }
+    
+    /**
+     * 获取房间特定的最小玩家数配置
+     * @param arenaName 房间名
+     * @param mapId 地图ID
+     * @return 最小玩家数
+     */
+    public int getRoomMinPlayers(String arenaName, String mapId) {
+        // 首先检查房间特定的配置
+        if (arenaModule != null) {
+            ConfigurationSection roomsSection = arenaModule.getConfigurationSection("rooms");
+            if (roomsSection != null) {
+                ConfigurationSection roomSection = roomsSection.getConfigurationSection(arenaName);
+                if (roomSection != null && roomSection.contains("min-players")) {
+                    return roomSection.getInt("min-players");
+                }
+            }
+        }
+        
+        // 如果房间没有配置，使用地图特定的配置
+        if (mapId != null) {
+            int mapMinPlayers = getMapMinPlayers(mapId);
+            return mapMinPlayers;
+        }
+        
+        // 如果地图也没有配置，返回2人
+        return 2;
+    }
+    
+    /**
+     * 获取房间特定的投票持续时间配置
+     * @param arenaName 房间名
+     * @param mapId 地图ID
+     * @return 投票持续时间秒数
+     */
+    public int getRoomVoteDuration(String arenaName, String mapId) {
+        // 首先检查房间特定的配置
+        if (arenaModule != null) {
+            ConfigurationSection roomsSection = arenaModule.getConfigurationSection("rooms");
+            if (roomsSection != null) {
+                ConfigurationSection roomSection = roomsSection.getConfigurationSection(arenaName);
+                if (roomSection != null && roomSection.contains("vote-duration")) {
+                    return roomSection.getInt("vote-duration");
+                }
+            }
+        }
+        
+        // 如果房间没有配置，使用地图特定的配置
+        if (mapId != null) {
+            int mapVoteDuration = getMapVoteDuration(mapId);
+            return mapVoteDuration;
+        }
+        
+        // 如果地图也没有配置，返回15秒
+        return 15;
     }
     
     /**
@@ -608,7 +714,7 @@ public class ConfigManager {
                         weights.put(type, weight);
                     }
                 } catch (IllegalArgumentException e) {
-                    plugin.getLogger().warning("无效的盟友生物类型: " + key);
+                    debugLogger.warning("无效的盟友生物类型: " + key);
                 }
             }
         }
@@ -761,9 +867,37 @@ public class ConfigManager {
         return readBoolean(mapResetModule, "post-reset-clear-flowing", "map-reset.post-reset-clear-flowing", true);
     }
     
-    // ==========================================  
+    // ==========================================
+    // 调试配置读取方法
+    // ==========================================
+    
+    /**
+     * 检查是否启用调试
+     * @return 是否启用调试
+     */
+    public boolean isDebugEnabled() {
+        return readBoolean(null, "debug.enabled", "debug.enabled", false);
+    }
+    
+    /**
+     * 获取调试级别
+     * @return 调试级别（basic/verbose）
+     */
+    public String getDebugLevel() {
+        return readString(null, "debug.level", "debug.level", "basic");
+    }
+    
+    /**
+     * 检查是否过滤重复消息
+     * @return 是否过滤重复消息
+     */
+    public boolean isFilterRepeatingEnabled() {
+        return readBoolean(null, "debug.filter-repeating", "debug.filter-repeating", true);
+    }
+    
+    // ==========================================
     // 房间配置读取方法
-    // ==========================================  
+    // ==========================================
     
     /**
      * 读取房间的准备房间位置

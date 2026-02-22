@@ -178,6 +178,12 @@ public class ArenaManager {
             if (voteManager != null) {
                 voteManager.cancelVote(arenaName);
             }
+            
+            // 取消空投任务
+            AirdropManager airdropManager = pluginInstance.getAirdropManager();
+            if (airdropManager != null) {
+                airdropManager.stopAirdropForArena(arenaName);
+            }
         }
         
         // 从玩家房间映射中移除所有在此房间的玩家
@@ -291,7 +297,7 @@ public class ArenaManager {
                         player.sendMessage("§a已重新加入房间 '§6" + arenaName + "§a'！");
                         
                         int playerCount = arena.getPlayerCount();
-                        int minPlayers = config.getMinPlayers();
+                        int minPlayers = config.getRoomMinPlayers(arenaName, null);
                         
                         // 检查地图投票
                         RandomItemPVP pluginInstance2 = (RandomItemPVP) plugin;
@@ -306,8 +312,8 @@ public class ArenaManager {
                             cancelAutoStart(arenaName);
                         } else {
                             // 人数足够，检查是否需要开始投票
-                            if (voteManager2 != null && !voteManager2.isVoting(arenaName)) {
-                                // 达到最少玩家数，开始投票
+                            if (voteManager2 != null && !voteManager2.isVoting(arenaName) && !arena.isPreparing() && !arena.isRunning()) {
+                                // 达到最少玩家数且房间不在准备或运行状态，开始投票
                                 if (voteManager2.startVote(arenaName, playerCount, minPlayers)) {
                                     sendMessageToArena(arenaName, "§a[房间 " + arenaName + "] 玩家数已足够，地图投票开始！");
                                 }
@@ -368,7 +374,7 @@ public class ArenaManager {
             int playerCount = arena.getPlayerCount();
             // 使用当前地图的最少玩家数（如果有），否则使用全局配置
             String currentMapId = arena.getCurrentMapId();
-            int minPlayers = currentMapId != null ? config.getMapMinPlayers(currentMapId) : config.getMinPlayers();
+            int minPlayers = config.getRoomMinPlayers(arenaName, currentMapId);
             
             // 检查地图投票
             RandomItemPVP pluginInstance = (RandomItemPVP) plugin;
@@ -385,8 +391,8 @@ public class ArenaManager {
                 cancelAutoStart(arenaName);
             } else {
                 // 人数足够，检查是否需要开始投票
-                if (voteManager != null && !voteManager.isVoting(arenaName)) {
-                    // 达到最少玩家数，开始投票
+                if (voteManager != null && !voteManager.isVoting(arenaName) && !arena.isPreparing() && !arena.isRunning()) {
+                    // 达到最少玩家数且房间不在准备或运行状态，开始投票
                     if (voteManager.startVote(arenaName, playerCount, minPlayers)) {
                         sendMessageToArena(arenaName, "§a[房间 " + arenaName + "] 玩家数已足够，地图投票开始！");
                     }
@@ -559,7 +565,7 @@ public class ArenaManager {
             // 再次检查玩家数和状态
             GameInstance instance = arena.getGameInstance();
             int playerCount = instance.getParticipantCount();
-            int minPlayers = config.getMinPlayers();
+            int minPlayers = config.getRoomMinPlayers(arena.getArenaName(), null);
             
             if (playerCount >= minPlayers && !arena.isPreparing() && !arena.isRunning()) {
                 startCountdown(arena);
@@ -601,7 +607,7 @@ public class ArenaManager {
                 String arenaName = arena.getArenaName();
                 // 使用当前地图的投票时长（如果有），否则使用全局配置
                 String currentMapId = arena.getCurrentMapId();
-                int voteDuration = currentMapId != null ? config.getMapVoteDuration(currentMapId) : config.getVoteDuration();
+                int voteDuration = config.getRoomVoteDuration(arenaName, currentMapId);
                 
                 // 等待投票结束后直接开始游戏，不需要倒计时
                 Bukkit.getGlobalRegionScheduler().runDelayed(plugin, task -> {
@@ -651,7 +657,7 @@ public class ArenaManager {
                     
                     // 使用当前地图的最少玩家数（如果有），否则使用全局配置
                     String arenaCurrentMapId = arena.getCurrentMapId();
-                    int minPlayers = arenaCurrentMapId != null ? config.getMapMinPlayers(arenaCurrentMapId) : config.getMinPlayers();
+                    int minPlayers = config.getRoomMinPlayers(arenaName, arenaCurrentMapId);
                     if (participantsSet.size() >= minPlayers) {
                         // 确保有出生点
                         if (arena.getSpawnLocation() != null) {
@@ -716,7 +722,7 @@ public class ArenaManager {
         
         // 使用当前地图的最少玩家数（如果有），否则使用全局配置
         String currentMapId = arena.getCurrentMapId();
-        int minPlayers = currentMapId != null ? config.getMapMinPlayers(currentMapId) : config.getMinPlayers();
+        int minPlayers = config.getRoomMinPlayers(arena.getArenaName(), currentMapId);
         if (participantsSet.size() >= minPlayers) {
             // 确保有出生点
             if (arena.getSpawnLocation() != null) {

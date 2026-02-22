@@ -23,6 +23,7 @@ public class GameInstance {
     private final JavaPlugin plugin;
     private final ConfigManager config;
     private final PlayerStatsManager statsManager;
+    private final DebugLogger debugLogger;
     
     // 游戏状态
     private volatile boolean gameRunning = false;
@@ -71,6 +72,7 @@ public class GameInstance {
         this.plugin = plugin;
         this.config = config;
         this.statsManager = statsManager;
+        this.debugLogger = RandomItemPVP.getInstance().getDebugLogger();
     }
     
     /**
@@ -115,7 +117,7 @@ public class GameInstance {
                 gatherLocation = spawnLoc;
             } else {
                 // 如果出生点也为 null，使用临时位置（不应该发生，但作为保护）
-                plugin.getLogger().warning("[房间 " + arena.getArenaName() + "] 准备房间位置和出生点都为 null！使用临时位置。");
+                debugLogger.warning("[房间 " + arena.getArenaName() + "] 准备房间位置和出生点都为 null！使用临时位置。");
                 gatherLocation = Bukkit.getWorlds().get(0).getSpawnLocation();
             }
         }
@@ -506,8 +508,8 @@ public class GameInstance {
             }
         }
         
-        // 使用当前地图的倒计时配置（如果有），否则使用全局配置
-        int countdown = currentMapId != null ? config.getMapStartCountdown(currentMapId) : config.getStartCountdown();
+        // 使用房间特定的倒计时配置（如果有），否则使用地图配置，最后使用30秒
+        int countdown = config.getRoomStartCountdown(arena.getArenaName(), currentMapId);
         final int[] currentCount = {countdown}; // 使用数组以便在 lambda 中修改
         
         // 使用定时任务进行倒计时
@@ -530,8 +532,8 @@ public class GameInstance {
                 countdownTask = null;
                 preparing = false;
                 
-                // 检查参与者数量（使用当前地图的配置）
-                int minPlayers = currentMapId != null ? config.getMapMinPlayers(currentMapId) : config.getMinPlayers();
+                // 检查参与者数量（使用房间特定的配置）
+                int minPlayers = config.getRoomMinPlayers(arena.getArenaName(), currentMapId);
                 if (participants.size() < minPlayers) {
                     // 向房间内的玩家发送消息
                     for (Player p : participants) {
@@ -710,7 +712,7 @@ public class GameInstance {
                 
                 // 检查参与者数量
                 String currentMapId = arena.getCurrentMapId();
-                int minPlayers = currentMapId != null ? config.getMapMinPlayers(currentMapId) : config.getMinPlayers();
+                int minPlayers = config.getRoomMinPlayers(arena.getArenaName(), currentMapId);
                 if (participants.size() < minPlayers) {
                     for (Player p : participants) { if (p.isOnline()) { p.sendMessage("§c[房间 " + arena.getArenaName() + "] 参与者不足！游戏取消。需要至少 " + minPlayers + " 人"); } }
                     cancelGame();
@@ -960,7 +962,7 @@ public class GameInstance {
         
         // 重置地图（即使房间被删除也要重置）
         if (mapResetter != null) {
-            plugin.getLogger().info("[房间 " + arena.getArenaName() + "] 房间被删除，开始重置地图...");
+            debugLogger.info("[房间 " + arena.getArenaName() + "] 房间被删除，开始重置地图...");
             Bukkit.getGlobalRegionScheduler().runDelayed(plugin, task -> {
                 mapResetter.resetMap();
                 mapResetter = null;
@@ -1029,7 +1031,7 @@ public class GameInstance {
                             // 此玩家在此房间中，确保在参与者列表中
                             if (!participants.contains(p)) {
                                 participants.add(p);
-                                plugin.getLogger().info("修复：玩家 " + p.getName() + " 不在参与者列表中，已添加");
+                                debugLogger.info("修复：玩家 " + p.getName() + " 不在参与者列表中，已添加");
                             }
                             // 确保有原始位置记录
                             if (playerOriginalLocations.get(p) == null) {
@@ -2288,7 +2290,7 @@ public class GameInstance {
                 }
             }
             
-            // 恢复观战者的游戏模式和物品，并传送回原位置
+            // 恢复观战者的游戏模式和物品，并传送回大厅
             for (Player spectator : new ArrayList<>(spectatorInventories.keySet())) {
                 if (spectator.isOnline()) {
                     // 恢复游戏模式
@@ -2309,28 +2311,20 @@ public class GameInstance {
                         spectator.getInventory().setContents(restoredItems);
                     }
                     
-                    // 传送观战者回原始位置（如果有保存）
-                    Location originalLoc = spectatorOriginalLocations.remove(spectator);
-                    if (originalLoc != null && originalLoc.getWorld() != null) {
-                        Location safeLoc = findSafeLocation(originalLoc);
-                        if (safeLoc != null) {
-                            spectator.teleportAsync(safeLoc).thenRun(() -> {
-                                spectator.sendMessage("§a[房间 " + arena.getArenaName() + "] 游戏结束，已传送回原位置！");
-                            });
-                        } else {
-                            // 如果原位置不安全，传送到世界出生点
-                            if (arena.getWorld() != null) {
-                                Location spawnLoc = arena.getWorld().getSpawnLocation();
-                                Location safeSpawn = findSafeLocation(spawnLoc);
-                                if (safeSpawn != null) {
-                                    spectator.teleportAsync(safeSpawn).thenRun(() -> {
-                                        spectator.sendMessage("§a[房间 " + arena.getArenaName() + "] 游戏结束，已传送到世界出生点！");
-                                    });
-                                }
-                            }
-                        }
+                    // 传送到大厅
+                    Location safeLobby = findSafeLocation(lobbyLocation);
+                    if (safeLobby != null) {
+                        spectator.teleportAsync(safeLobby).thenRun(() -> {
+                            // 设置重生点为大厅位置
+                            spectator.setBedSpawnLocation(safeLobby, true);
+                            spectator.sendMessage("§a已传送回大厅！");
+                        });
                     } else {
-                        spectator.sendMessage("§a[房间 " + arena.getArenaName() + "] 游戏结束，已恢复正常模式！");
+                        spectator.teleportAsync(lobbyLocation).thenRun(() -> {
+                            // 设置重生点为大厅位置
+                            spectator.setBedSpawnLocation(lobbyLocation, true);
+                            spectator.sendMessage("§a已传送回大厅！");
+                        });
                     }
                 }
             }

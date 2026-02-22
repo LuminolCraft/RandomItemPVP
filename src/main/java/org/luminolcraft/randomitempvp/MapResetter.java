@@ -175,6 +175,23 @@ public class MapResetter implements Listener {
             public void run() {
                 plugin.getLogger().info("[地图重置] 开始保存初始地图状态...");
                 
+                // 确保数据存储已初始化
+                if (originalBlockData == null) {
+                    originalBlockData = new ConcurrentHashMap<>();
+                    plugin.getLogger().info("[地图重置] 初始化 originalBlockData 为新的 ConcurrentHashMap");
+                } else {
+                    originalBlockData.clear();
+                    plugin.getLogger().info("[地图重置] 清空现有的 originalBlockData");
+                }
+                
+                if (originalBlockStates == null) {
+                    originalBlockStates = new ConcurrentHashMap<>();
+                    plugin.getLogger().info("[地图重置] 初始化 originalBlockStates 为新的 ConcurrentHashMap");
+                } else {
+                    originalBlockStates.clear();
+                    plugin.getLogger().info("[地图重置] 清空现有的 originalBlockStates");
+                }
+                
                 final int minX = (int) (center.getX() - radius);
                 final int maxX = (int) (center.getX() + radius);
                 final int minZ = (int) (center.getZ() - radius);
@@ -752,45 +769,49 @@ public class MapResetter implements Listener {
             // 创建基本方块数据节点
             ObjectNode blockDataNode = mapper.createObjectNode();
             // 保存基本方块数据
-            for (Map.Entry<BlockPos, BlockData> entry : originalBlockData.entrySet()) {
-                BlockPos blockPos = entry.getKey();
-                BlockData blockData = entry.getValue();
-                String key = blockPos.toString();
-                blockDataNode.put(key, blockData.getAsString());
+            if (originalBlockData != null) {
+                for (Map.Entry<BlockPos, BlockData> entry : originalBlockData.entrySet()) {
+                    BlockPos blockPos = entry.getKey();
+                    BlockData blockData = entry.getValue();
+                    String key = blockPos.toString();
+                    blockDataNode.put(key, blockData.getAsString());
+                }
             }
             rootNode.set("blockData", blockDataNode);
             
             // 创建实体方块数据节点
             ObjectNode blockStatesNode = mapper.createObjectNode();
-            for (Map.Entry<BlockPos, BlockState> entry : originalBlockStates.entrySet()) {
-                BlockPos blockPos = entry.getKey();
-                BlockState state = entry.getValue();
-                String key = blockPos.toString();
-                
-                ObjectNode stateNode = mapper.createObjectNode();
-                // 保存方块类型
-                stateNode.put("type", state.getType().name());
-                
-                // 保存方块数据
-                stateNode.put("blockData", state.getBlockData().getAsString());
-                
-                // 保存方块实体数据（如果是容器）
-                if (state instanceof org.bukkit.block.Container) {
-                    org.bukkit.block.Container container = (org.bukkit.block.Container) state;
-                    org.bukkit.inventory.ItemStack[] contents = container.getInventory().getContents();
-                    ObjectNode contentsNode = mapper.createObjectNode();
-                    for (int i = 0; i < contents.length; i++) {
-                        if (contents[i] != null) {
-                            // 保存物品数据为Map
-                            Map<String, Object> itemData = contents[i].serialize();
-                            ObjectNode itemNode = mapper.valueToTree(itemData);
-                            contentsNode.set(String.valueOf(i), itemNode);
+            if (originalBlockStates != null) {
+                for (Map.Entry<BlockPos, BlockState> entry : originalBlockStates.entrySet()) {
+                    BlockPos blockPos = entry.getKey();
+                    BlockState state = entry.getValue();
+                    String key = blockPos.toString();
+                    
+                    ObjectNode stateNode = mapper.createObjectNode();
+                    // 保存方块类型
+                    stateNode.put("type", state.getType().name());
+                    
+                    // 保存方块数据
+                    stateNode.put("blockData", state.getBlockData().getAsString());
+                    
+                    // 保存方块实体数据（如果是容器）
+                    if (state instanceof org.bukkit.block.Container) {
+                        org.bukkit.block.Container container = (org.bukkit.block.Container) state;
+                        org.bukkit.inventory.ItemStack[] contents = container.getInventory().getContents();
+                        ObjectNode contentsNode = mapper.createObjectNode();
+                        for (int i = 0; i < contents.length; i++) {
+                            if (contents[i] != null) {
+                                // 保存物品数据为Map
+                                Map<String, Object> itemData = contents[i].serialize();
+                                ObjectNode itemNode = mapper.valueToTree(itemData);
+                                contentsNode.set(String.valueOf(i), itemNode);
+                            }
                         }
+                        stateNode.set("contents", contentsNode);
                     }
-                    stateNode.set("contents", contentsNode);
+                    
+                    blockStatesNode.set(key, stateNode);
                 }
-                
-                blockStatesNode.set(key, stateNode);
             }
             rootNode.set("blockStates", blockStatesNode);
             

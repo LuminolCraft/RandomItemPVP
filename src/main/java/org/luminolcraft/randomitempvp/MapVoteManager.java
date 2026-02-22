@@ -117,7 +117,7 @@ public class MapVoteManager {
         sendVoteStartMessages(arenaName, availableMaps);
         
         // 启动投票倒计时
-        int duration = config.getVoteDuration();
+        int duration = config.getRoomVoteDuration(arenaName, null);
         final int[] remaining = new int[]{duration};
         voteRemainingTime.put(arenaName, remaining);
         
@@ -134,7 +134,7 @@ public class MapVoteManager {
                 GameInstance instance = arena.getGameInstance();
                 Set<Player> participants = instance.getParticipants();
                 int currentCount = participants.size();
-                int minPlayerCount = config.getMinPlayers();
+                int minPlayerCount = config.getRoomMinPlayers(arenaName, null);
                 
                 if (currentCount < minPlayerCount) {
                     // 玩家数量不足，取消投票
@@ -154,8 +154,8 @@ public class MapVoteManager {
                 voteTasks.remove(arenaName);
                 voteRemainingTime.remove(arenaName);
             } else {
-                // 显示剩余时间和提示（更频繁地显示）
-                if (remaining[0] <= 10 || remaining[0] % 3 == 0) {
+                // 显示剩余时间和提示（减少频率）
+                if (remaining[0] <= 10 || remaining[0] % 5 == 0) {
                     sendVoteReminder(arenaName, remaining[0], availableMaps);
                 }
             }
@@ -177,7 +177,7 @@ public class MapVoteManager {
         
         int[] remaining = voteRemainingTime.get(arenaName);
         if (remaining != null) {
-            int maxDuration = config.getVoteDuration();
+            int maxDuration = config.getRoomVoteDuration(arenaName, null);
             // 延长投票时间，但不超过最大持续时间
             remaining[0] = Math.min(remaining[0] + extraSeconds, maxDuration);
             sendMessageToArena(arenaName, "§e[房间 " + arenaName + "] 有新玩家加入！投票时间延长 " + extraSeconds + " 秒");
@@ -226,7 +226,47 @@ public class MapVoteManager {
         // 显示当前投票结果
         showVoteResults(arenaName);
         
+        // 检查是否所有玩家都已经投票
+        checkAllPlayersVoted(arenaName);
+        
         return true;
+    }
+    
+    /**
+     * 检查是否所有玩家都已经投票
+     * @param arenaName 房间名
+     */
+    private void checkAllPlayersVoted(String arenaName) {
+        Map<String, Set<Player>> arenaVotes = votes.get(arenaName);
+        if (arenaVotes == null) return;
+        
+        // 获取房间内的玩家列表
+        GameArena arena = arenaManager.getArena(arenaName);
+        if (arena == null) return;
+        
+        GameInstance instance = arena.getGameInstance();
+        Set<Player> participants = instance.getParticipants();
+        int playerCount = participants.size();
+        
+        // 统计已投票的玩家数量
+        int votedCount = 0;
+        for (Set<Player> voters : arenaVotes.values()) {
+            votedCount += voters.size();
+        }
+        
+        // 如果所有玩家都已经投票，调整投票时间为15秒（如果当前剩余时间小于15秒）
+        if (votedCount >= playerCount) {
+            int[] remaining = voteRemainingTime.get(arenaName);
+            if (remaining != null) {
+                int minVoteTime = 15; // 最小投票时间为15秒
+                if (remaining[0] < minVoteTime) {
+                    remaining[0] = minVoteTime;
+                    sendMessageToArena(arenaName, "§a[房间 " + arenaName + "] 所有玩家都已投票！投票时间设置为 " + minVoteTime + " 秒");
+                } else {
+                    sendMessageToArena(arenaName, "§a[房间 " + arenaName + "] 所有玩家都已投票！投票将在剩余时间结束后结束");
+                }
+            }
+        }
     }
     
     /**

@@ -25,7 +25,7 @@ lobby:
   pitch: 0.0 # 视角俯仰角
 
 # 房间特定的准备房间配置
-# 每个房间可以有独立的准备房间位置
+# 每个房间可以有独立的准备房间位置和时间配置
 # 格式：<房间名>:
 #         world: '世界名'
 #         x: X坐标
@@ -33,6 +33,8 @@ lobby:
 #         z: Z坐标
 #         yaw: 偏航角
 #         pitch: 俯仰角
+#         start-countdown: 准备倒计时（秒）
+#         vote-duration: 地图投票持续时间（秒）
 rooms:
   room1:
     world: 'ready'    # Worlds 插件的世界 key（可选，未设置则使用地图的世界）
@@ -41,6 +43,8 @@ rooms:
     z: -89          # Z坐标（可选，未设置则使用地图的Z坐标）
     yaw: 0.0          # 视角偏航角（可选，未设置则使用地图的yaw）
     pitch: 0.0        # 视角俯仰角（可选，未设置则使用地图的pitch）
+    start-countdown: 30 # 准备倒计时（秒）
+    vote-duration: 15   # 地图投票持续时间（秒）
   room2:
     world: 'ready'    # Worlds 插件的世界 key（可选，未设置则使用地图的世界）
     x: -80            # X坐标（可选，未设置则使用地图的X坐标）
@@ -48,6 +52,8 @@ rooms:
     z: 17            # Z坐标（可选，未设置则使用地图的Z坐标）
     yaw: 0.0          # 视角偏航角（可选，未设置则使用地图的yaw）
     pitch: 0.0        # 视角俯仰角（可选，未设置则使用地图的pitch）
+    start-countdown: 30 # 准备倒计时（秒）
+    vote-duration: 15   # 地图投票持续时间（秒）
   room3:
     world: 'ready'    # Worlds 插件的世界 key（可选，未设置则使用地图的世界）
     x: 5         # X坐标（可选，未设置则使用地图的X坐标）
@@ -55,6 +61,8 @@ rooms:
     z: 7         # Z坐标（可选，未设置则使用地图的Z坐标）
     yaw: 0.0          # 视角偏航角（可选，未设置则使用地图的yaw）
     pitch: 0.0        # 视角俯仰角（可选，未设置则使用地图的pitch）
+    start-countdown: 30 # 准备倒计时（秒）
+    vote-duration: 15   # 地图投票持续时间（秒）
   room4:
     world: 'ready'    # Worlds 插件的世界 key（可选，未设置则使用地图的世界）
     x: 8         # X坐标（可选，未设置则使用地图的X坐标）
@@ -62,5 +70,7 @@ rooms:
     z: 8         # Z坐标（可选，未设置则使用地图的Z坐标）
     yaw: 0.0          # 视角偏航角（可选，未设置则使用地图的yaw）
     pitch: 0.0        # 视角俯仰角（可选，未设置则使用地图的pitch）
+    start-countdown: 30 # 准备倒计时（秒）
+    vote-duration: 15   # 地图投票持续时间（秒）
 
 

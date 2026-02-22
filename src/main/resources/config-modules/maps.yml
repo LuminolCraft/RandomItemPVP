@@ -26,9 +26,7 @@ map10:
   # 地图特定配置（可选，未设置则使用全局配置）
   radius: 50          # 初始边界半径（格）
   min-players: 2      # 最少玩家数才能开始
-  start-countdown: 30 # 准备倒计时（秒）
   auto-start-delay: 5 # 达到最少玩家数后，延迟几秒再开始倒计时（秒，0=立即开始）
-  vote-duration: 15   # 地图投票持续时间（秒）
 
 map1:
   name: 'lucky'        # 地图显示名称
@@ -41,9 +39,7 @@ map1:
   # 地图特定配置（可选，未设置则使用全局配置）
   radius: 50          # 初始边界半径（格）
   min-players: 2      # 最少玩家数才能开始
-  start-countdown: 30 # 准备倒计时（秒）
   auto-start-delay: 5 # 达到最少玩家数后，延迟几秒再开始倒计时（秒，0=立即开始）
-  vote-duration: 15   # 地图投票持续时间（秒）
 
 map2:
   name: 'yj'
@@ -56,9 +52,7 @@ map2:
   # 地图特定配置（可选，未设置则使用全局配置）
   radius: 48
   min-players: 2
-  start-countdown: 30
   auto-start-delay: 5
-  vote-duration: 15
 
 map3:
   name: 'bing'
@@ -71,9 +65,7 @@ map3:
   # 地图特定配置（可选，未设置则使用全局配置）
   radius: 50
   min-players: 2
-  start-countdown: 15
   auto-start-delay: 5
-  vote-duration: 15
 
 map4:
   name: 'mg'
@@ -86,7 +78,5 @@ map4:
   # 地图特定配置（可选，未设置则使用全局配置）
   radius: 50
   min-players: 2
-  start-countdown: 15
   auto-start-delay: 5
-  vote-duration: 15
 

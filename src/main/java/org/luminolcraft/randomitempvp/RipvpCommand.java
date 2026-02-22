@@ -20,12 +20,14 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
     private final ArenaManager arenaManager;
     private final ConfigManager configManager;
     private final PlayerStatsManager statsManager;
+    private final DebugLogger debugLogger;
     private static final String DEFAULT_ARENA = "default"; // 默认房间名
 
     public RipvpCommand(ArenaManager arenaManager, ConfigManager configManager, PlayerStatsManager statsManager) {
         this.arenaManager = arenaManager;
         this.configManager = configManager;
         this.statsManager = statsManager;
+        this.debugLogger = RandomItemPVP.getInstance().getDebugLogger();
     }
 
     @Override
@@ -100,14 +102,15 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                         GameInstance startInstance = startArena.getGameInstance();
                         Set<Player> startParticipantsSet = startInstance.getParticipants();
                         
-                        if (startParticipantsSet.size() >= configManager.getMinPlayers()) {
+                        int minPlayers = configManager.getRoomMinPlayers(startArenaName, null);
+                        if (startParticipantsSet.size() >= minPlayers) {
                             List<Player> startParticipants = new ArrayList<>(startParticipantsSet);
                             startInstance.startGameWithCountdown(startParticipants);
                             player.sendMessage(ChatColor.GREEN + "房间 '§6" + startArenaName + "§a' 游戏倒计时已开始！");
                         } else {
                             player.sendMessage(ChatColor.YELLOW + "玩家数不足！当前：§e" + startParticipantsSet.size() + 
-                                "§7/§e" + configManager.getMinPlayers() + 
-                                "§7，需要至少 §e" + configManager.getMinPlayers() + " §7人才能开始！");
+                                "§7/§e" + minPlayers + 
+                                "§7，需要至少 §e" + minPlayers + " §7人才能开始！");
                             player.sendMessage(ChatColor.GRAY + "其他玩家可以使用 /ripvp join " + startArenaName + " 加入");
                         }
                         return true;
@@ -144,26 +147,27 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                     
                     // 检查权限（只有管理员可以启动游戏，或房间内玩家数达到最少玩家数时任何人都可以启动）
                     Set<Player> participantsSet = playerArena.getGameInstance().getParticipants();
+                    int minPlayers = configManager.getRoomMinPlayers(playerArenaName, null);
                     boolean canStart = player.hasPermission("ripvp.admin") || 
-                                      participantsSet.size() >= configManager.getMinPlayers();
+                                      participantsSet.size() >= minPlayers;
                     
                     if (!canStart) {
                         player.sendMessage(ChatColor.RED + "你没有权限启动游戏！");
-                        player.sendMessage(ChatColor.YELLOW + "需要至少 §e" + configManager.getMinPlayers() + 
+                        player.sendMessage(ChatColor.YELLOW + "需要至少 §e" + minPlayers + 
                             " §7人才能开始，或者需要管理员权限");
                         return true;
                     }
                     
                     // 启动游戏倒计时
                     GameInstance arenaInstance = playerArena.getGameInstance();
-                    if (participantsSet.size() >= configManager.getMinPlayers()) {
+                    if (participantsSet.size() >= minPlayers) {
                         List<Player> participants = new ArrayList<>(participantsSet);
                         arenaInstance.startGameWithCountdown(participants);
                         player.sendMessage(ChatColor.GREEN + "房间 '§6" + playerArenaName + "§a' 游戏倒计时已开始！");
                     } else {
                         player.sendMessage(ChatColor.YELLOW + "玩家数不足！当前：§e" + participantsSet.size() + 
-                            "§7/§e" + configManager.getMinPlayers() + 
-                            "§7，需要至少 §e" + configManager.getMinPlayers() + " §7人才能开始！");
+                            "§7/§e" + minPlayers + 
+                            "§7，需要至少 §e" + minPlayers + " §7人才能开始！");
                         player.sendMessage(ChatColor.GRAY + "其他玩家可以使用 /ripvp join " + playerArenaName + " 加入");
                     }
                     return true;
@@ -279,8 +283,11 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                     sender.sendMessage(ChatColor.GREEN + "✓ 配置文件已热加载！");
                     sender.sendMessage(ChatColor.AQUA + "当前配置：");
                     sender.sendMessage(ChatColor.WHITE + "  - 竞技场半径: " + ChatColor.YELLOW + configManager.getArenaRadius());
-                    sender.sendMessage(ChatColor.WHITE + "  - 最少玩家数: " + ChatColor.YELLOW + configManager.getMinPlayers());
-                    sender.sendMessage(ChatColor.WHITE + "  - 倒计时时长: " + ChatColor.YELLOW + configManager.getStartCountdown() + "秒");
+                    // 使用默认房间的配置作为显示值
+                    int defaultMinPlayers = configManager.getRoomMinPlayers("room1", null);
+                    int defaultCountdown = configManager.getRoomStartCountdown("room1", null);
+                    sender.sendMessage(ChatColor.WHITE + "  - 最少玩家数: " + ChatColor.YELLOW + defaultMinPlayers);
+                    sender.sendMessage(ChatColor.WHITE + "  - 倒计时时长: " + ChatColor.YELLOW + defaultCountdown + "秒");
                     sender.sendMessage(ChatColor.WHITE + "  - 边界伤害: " + ChatColor.YELLOW + configManager.getBorderDamageAmount() + "/秒");
                     sender.sendMessage(ChatColor.WHITE + "  - 物品发放间隔: " + ChatColor.YELLOW + (configManager.getItemInterval() / 20.0) + "秒");
                     sender.sendMessage(ChatColor.WHITE + "  - 物品种类数: " + ChatColor.YELLOW + configManager.getItemWeights().size());
@@ -300,9 +307,9 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
 
                     RandomItemPVP pluginInstance = RandomItemPVP.getInstance();
                     if (pluginInstance != null) {
-                        pluginInstance.getLogger().info("配置热加载完成 -> " + String.join(", ", reloadedFiles));
+                        debugLogger.info("配置热加载完成 -> " + String.join(", ", reloadedFiles));
                         if (!fixedArenas.isEmpty()) {
-                            pluginInstance.getLogger().info("已重新加载 " + fixedArenas.size() + " 个固定房间：" + String.join(", ", fixedArenas));
+                            debugLogger.info("已重新加载 " + fixedArenas.size() + " 个固定房间：" + String.join(", ", fixedArenas));
                         }
                     }
                     return true;
@@ -450,7 +457,7 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                             if (voteArena != null && !voteArena.isRunning() && !voteArena.isPreparing()) {
                                 // 重新开始投票
                                 int playerCount = voteArena.getPlayerCount();
-                                int minPlayers = configManager.getMinPlayers();
+                                int minPlayers = configManager.getRoomMinPlayers(voteArenaName, null);
                                 if (voteManager.startVote(voteArenaName, playerCount, minPlayers)) {
                                     player.sendMessage(ChatColor.GREEN + "房间 '" + voteArenaName + "' 的投票已重新开始！");
                                     // 再次执行投票
@@ -492,9 +499,9 @@ public class RipvpCommand implements CommandExecutor, TabCompleter {
                             listArena.syncStatus();
                             
                             int playerCount = listArena.getPlayerCount();
-                            // 使用当前地图的最少玩家数（如果有），否则使用全局配置
+                            // 使用房间特定的最少玩家数
                             String currentMapId = listArena.getCurrentMapId();
-                            int minPlayers = currentMapId != null ? configManager.getMapMinPlayers(currentMapId) : configManager.getMinPlayers();
+                            int minPlayers = configManager.getRoomMinPlayers(name, currentMapId);
                             String statusText = getArenaStatusText(listArena);
                             
                             // 显示格式：房间名 - 状态 (当前玩家数人，最少需要minPlayers人)

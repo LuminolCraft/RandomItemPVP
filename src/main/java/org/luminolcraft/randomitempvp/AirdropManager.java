@@ -64,7 +64,7 @@ public class AirdropManager implements Listener {
                 ArenaManager arenaManager = ((RandomItemPVP) plugin).getArenaManager();
                 if (arenaManager != null) {
                     GameArena arena = arenaManager.getArena(arenaName);
-                    if (arena != null && arena.getGameInstance().isRunning()) {
+                    if (arena != null && arena.getGameInstance() != null && arena.getGameInstance().isRunning()) {
                         isRunning = true;
                     }
                 }
@@ -76,7 +76,9 @@ public class AirdropManager implements Listener {
                 return;
             }
             
-            dropAirdropForArena(arenaName, centerLocation);
+            if (centerLocation != null && centerLocation.getWorld() != null) {
+                dropAirdropForArena(arenaName, centerLocation);
+            }
         }, FIRST_AIRDROP_DELAY, AIRDROP_INTERVAL_TICKS);
         
         arenaAirdropTasks.put(arenaName, task);
@@ -171,6 +173,10 @@ public class AirdropManager implements Listener {
      * 填充空投箱内容
      */
     private void fillAirdropChest(Inventory inv, World world) {
+        if (inv == null) {
+            return;
+        }
+        
         // 稀有物品池
         List<ItemStack> rareItems = Arrays.asList(
             new ItemStack(Material.DIAMOND_SWORD, 1),
@@ -210,7 +216,7 @@ public class AirdropManager implements Listener {
         inv.addItem(guaranteed);
         
         // 检查是否应该添加盟友刷怪蛋（游戏后期）
-        if (allyMobManager != null && allyMobManager.isEnabled() && plugin instanceof RandomItemPVP) {
+        if (allyMobManager != null && allyMobManager.isEnabled() && plugin instanceof RandomItemPVP && world != null) {
             RandomItemPVP pluginInstance = (RandomItemPVP) plugin;
             ArenaManager arenaManager = pluginInstance.getArenaManager();
             if (arenaManager != null) {
@@ -218,24 +224,26 @@ public class AirdropManager implements Listener {
                 if (config != null) {
                     // 获取当前边界大小和初始边界大小
                     WorldBorder border = world.getWorldBorder();
-                    double currentSize = border.getSize();
-                    double initialSize = config.getInitialBorderSize();
-                    
-                    // 计算游戏进度（边界缩小比例）
-                    double progress = 1.0 - (currentSize / initialSize); // 0.0 = 游戏开始, 1.0 = 游戏结束
-                    double threshold = config.getAllyGameProgressThreshold();
-                    
-                    // 如果达到阈值，添加盟友刷怪蛋
-                    if (progress >= threshold) {
-                        int eggsPerAirdrop = config.getAllySpawnEggsPerAirdrop();
-                        Map<EntityType, Integer> allyWeights = config.getAllyWeights();
+                    if (border != null) {
+                        double currentSize = border.getSize();
+                        double initialSize = config.getInitialBorderSize();
                         
-                        if (!allyWeights.isEmpty()) {
-                            for (int i = 0; i < eggsPerAirdrop; i++) {
-                                EntityType selectedType = selectWeightedAllyType(allyWeights);
-                                if (selectedType != null) {
-                                    ItemStack allyEgg = allyMobManager.createAllySpawnEgg(selectedType);
-                                    inv.addItem(allyEgg);
+                        // 计算游戏进度（边界缩小比例）
+                        double progress = 1.0 - (currentSize / initialSize); // 0.0 = 游戏开始, 1.0 = 游戏结束
+                        double threshold = config.getAllyGameProgressThreshold();
+                        
+                        // 如果达到阈值，添加盟友刷怪蛋
+                        if (progress >= threshold) {
+                            int eggsPerAirdrop = config.getAllySpawnEggsPerAirdrop();
+                            Map<EntityType, Integer> allyWeights = config.getAllyWeights();
+                            
+                            if (!allyWeights.isEmpty()) {
+                                for (int i = 0; i < eggsPerAirdrop; i++) {
+                                    EntityType selectedType = selectWeightedAllyType(allyWeights);
+                                    if (selectedType != null) {
+                                        ItemStack allyEgg = allyMobManager.createAllySpawnEgg(selectedType);
+                                        inv.addItem(allyEgg);
+                                    }
                                 }
                             }
                         }
@@ -314,10 +322,18 @@ public class AirdropManager implements Listener {
      * 为指定房间投放空投
      */
     private void dropAirdropForArena(String arenaName, Location center) {
+        if (center == null || center.getWorld() == null) {
+            return;
+        }
+        
         World world = center.getWorld();
         
         // 获取当前边界大小，确保空投掉落在边界内
         WorldBorder border = world.getWorldBorder();
+        if (border == null) {
+            return;
+        }
+        
         double currentSize = border.getSize();
         
         // 检查边界是否已缩小到最小范围
@@ -358,14 +374,16 @@ public class AirdropManager implements Listener {
                     GameArena arena = arenaManager.getArena(arenaName);
                     if (arena != null) {
                         GameInstance instance = arena.getGameInstance();
-                        Set<Player> participants = instance.getParticipants();
-                        
-                        // 向房间内的玩家播报
-                        for (Player p : participants) {
-                            if (p.isOnline()) {
-                                p.sendMessage("§6§l【空投来袭】§e稀有装备箱即将降落！坐标：§b" + 
-                                    dropLoc.getBlockX() + ", " + dropLoc.getBlockY() + ", " + dropLoc.getBlockZ());
-                                p.playSound(p.getLocation(), Sound.ENTITY_ENDER_DRAGON_FLAP, 1.0f, 0.8f);
+                        if (instance != null) {
+                            Set<Player> participants = instance.getParticipants();
+                            
+                            // 向房间内的玩家播报
+                            for (Player p : participants) {
+                                if (p.isOnline()) {
+                                    p.sendMessage("§6§l【空投来袭】§e稀有装备箱即将降落！坐标：§b" + 
+                                        dropLoc.getBlockX() + ", " + dropLoc.getBlockY() + ", " + dropLoc.getBlockZ());
+                                    p.playSound(p.getLocation(), Sound.ENTITY_ENDER_DRAGON_FLAP, 1.0f, 0.8f);
+                                }
                             }
                         }
                     }

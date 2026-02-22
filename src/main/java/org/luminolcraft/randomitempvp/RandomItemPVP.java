@@ -9,6 +9,7 @@ public final class RandomItemPVP extends JavaPlugin {
     private static RandomItemPVP instance;
     private ArenaManager arenaManager;
     private ConfigManager configManager;
+    private DebugLogger debugLogger;
     private ItemAbilityManager itemAbilityManager;
     private RewardManager rewardManager;
     private AirdropManager airdropManager;
@@ -26,6 +27,11 @@ public final class RandomItemPVP extends JavaPlugin {
         configManager = new ConfigManager(this);
         ConfigBootstrapper.ensureModularConfigs(this);
         configManager.loadConfig();
+        
+        // 初始化调试日志管理器
+        debugLogger = new DebugLogger(this, configManager);
+        // 将 DebugLogger 实例传递给 ConfigManager
+        configManager.setDebugLogger(debugLogger);
 
         // 初始化数据库管理器
         databaseManager = new DatabaseManager(this, configManager);
@@ -175,5 +181,9 @@ public final class RandomItemPVP extends JavaPlugin {
     
     public AllyMobManager getAllyMobManager() {
         return allyMobManager;
+    }
+    
+    public DebugLogger getDebugLogger() {
+        return debugLogger;
     }
 }
